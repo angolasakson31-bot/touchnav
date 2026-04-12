@@ -372,9 +372,12 @@ public class SettingsActivity extends Activity {
             L.isTr()?"Butonun görsel stilini seçer. Neon=parlak, Crystal=şeffaf dolgu, Plasma=çift halka."
                     :"Button visual style. Neon=glowing, Crystal=transparent fill, Plasma=double ring.");
         String[] names=L.styleNames();
-        LinearLayout row1=new LinearLayout(this); row1.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout row2=new LinearLayout(this); row2.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams rowLp=new LinearLayout.LayoutParams(-1,-2); rowLp.setMargins(0,0,0,px(6));
+        int perRow=4;
+        int rowCount=(int)Math.ceil(names.length/(double)perRow);
+        LinearLayout[] rows=new LinearLayout[rowCount];
+        for(int r2=0;r2<rowCount;r2++){
+            rows[r2]=new LinearLayout(this); rows[r2].setOrientation(LinearLayout.HORIZONTAL);
+        }
         View[] cells=new View[names.length];
         for (int i=0;i<names.length;i++) {
             final int si=i;
@@ -398,9 +401,14 @@ public class SettingsActivity extends Activity {
                 }
             });
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1f); lp.setMargins(0,0,px(3),0);
-            if(i<4) row1.addView(cell,lp); else row2.addView(cell,lp);
+            int rowIdx=i/perRow;
+            rows[rowIdx].addView(cell,lp);
         }
-        card.addView(row1,rowLp); card.addView(row2,new LinearLayout.LayoutParams(-1,-2));
+        for(int r2=0;r2<rowCount;r2++){
+            LinearLayout.LayoutParams rlp=new LinearLayout.LayoutParams(-1,-2);
+            rlp.setMargins(0,0,0,r2<rowCount-1?px(6):0);
+            card.addView(rows[r2],rlp);
+        }
         // Renk
         TextView cLbl=new TextView(this); cLbl.setText(L.color()); cLbl.setTextColor(sub()); cLbl.setTextSize(12);
         cLbl.setPadding(0,px(14),0,px(8)); card.addView(cLbl);
@@ -652,6 +660,12 @@ public class SettingsActivity extends Activity {
                     case 4:{for(int k=0;k<3;k++){rP.setMaskFilter(new BlurMaskFilter(r*(0.6f-k*.15f),BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(3f-k*.5f);rP.setAlpha(200-k*40);cv.drawCircle(cx,cy,r-1,rP);}rP.setMaskFilter(null);rP.setStrokeWidth(1f);rP.setAlpha(255);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-1,rP);break;}
                     case 5:{fP.setColor(Color.argb(40,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setStrokeWidth(2f);rP.setMaskFilter(null);rP.setAlpha(200);cv.drawCircle(cx,cy,r-1,rP);fP.setColor(0x18FFFFFF);cv.drawCircle(cx,cy-r*.18f,r*.42f,fP);break;}
                     case 6:{rP.setMaskFilter(new BlurMaskFilter(r*.22f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(2f);rP.setAlpha(180);cv.drawCircle(cx,cy,r*.9f,rP);rP.setMaskFilter(null);rP.setAlpha(220);cv.drawCircle(cx,cy,r*.55f,rP);break;}
+                    case 7:{fP.setColor(Color.argb(70,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setMaskFilter(null);rP.setStrokeWidth(2f);rP.setAlpha(200);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 8:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(2.5f);rP.setAlpha(255);cv.drawCircle(cx,cy,r*.55f,rP);rP.setStrokeWidth(1.5f);rP.setAlpha(160);cv.drawCircle(cx,cy,r*.78f,rP);rP.setMaskFilter(new BlurMaskFilter(r*.18f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(1f);rP.setAlpha(90);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 9:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(3f);rP.setAlpha(230);RectF ov=new RectF(cx-r+2f,cy-r+2f,cx+r-2f,cy+r-2f);cv.drawArc(ov,-50f,170f,false,rP);rP.setAlpha(120);cv.drawArc(ov,130f,170f,false,rP);fP.setColor(c);fP.setAlpha(200);cv.drawCircle(cx,cy,r*.1f,fP);break;}
+                    case 10:{fP.setColor(c);int dots=12;float dotR=r*.09f;for(int d2=0;d2<dots;d2++){double ang=(2*Math.PI*d2/dots)-Math.PI/2;float dx=(float)(cx+(r-dotR*2)*Math.cos(ang));float dy=(float)(cy+(r-dotR*2)*Math.sin(ang));fP.setAlpha(d2%2==0?230:100);cv.drawCircle(dx,dy,dotR,fP);}break;}
+                    case 11:{fP.setColor(Color.argb(50,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(new BlurMaskFilter(r*.55f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(4f);rP.setAlpha(255);cv.drawCircle(cx,cy,r*.75f,rP);rP.setMaskFilter(null);rP.setStrokeWidth(1.5f);rP.setAlpha(255);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 12:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(1.5f);rP.setAlpha(180);cv.drawCircle(cx,cy,r-1,rP);fP.setColor(c);fP.setAlpha(220);cv.drawCircle(cx,cy,r*.08f,fP);Paint lp2=new Paint(Paint.ANTI_ALIAS_FLAG);lp2.setColor(c);lp2.setAlpha(220);lp2.setStyle(Paint.Style.STROKE);lp2.setStrokeWidth(2f);lp2.setStrokeCap(Paint.Cap.ROUND);float tk=r*.28f;cv.drawLine(cx,cy-r+3f,cx,cy-r+3f+tk,lp2);cv.drawLine(cx,cy+r-3f-tk,cx,cy+r-3f,lp2);cv.drawLine(cx-r+3f,cy,cx-r+3f+tk,cy,lp2);cv.drawLine(cx+r-3f-tk,cy,cx+r-3f,cy,lp2);break;}
                 }
             }
         };

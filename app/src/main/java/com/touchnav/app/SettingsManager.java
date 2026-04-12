@@ -29,6 +29,12 @@ public class SettingsManager {
     public static final int STYLE_NEON    = 4;
     public static final int STYLE_CRYSTAL = 5;
     public static final int STYLE_PLASMA  = 6;
+    public static final int STYLE_SOLID   = 7;
+    public static final int STYLE_HALO    = 8;
+    public static final int STYLE_COMET   = 9;
+    public static final int STYLE_DOTRING = 10;
+    public static final int STYLE_FILNEON = 11;
+    public static final int STYLE_CROSS   = 12;
 
     // ── Buton şekilleri ──────────────────────────────────────────
     public static final int SHAPE_CIRCLE = 0;

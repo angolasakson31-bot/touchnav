@@ -128,12 +128,13 @@ public class FloatingService extends Service {
                 if (kbHeight < 150) kbHeight = (int)(screenH * 0.42f);
                 int visibleBottom = screenH - kbHeight;
 
+                // Her zaman mevcut Y konumunu kaydet
+                savedYBeforeKb = params.y;
+
                 // Butonun alt kenarı görünür alanın dışına taşıyorsa yukarı taşı
                 int btnBottom = params.y + params.height;
                 if (btnBottom > visibleBottom - dpToPx(8)) {
-                    savedYBeforeKb = params.y;
                     params.y = Math.max(0, visibleBottom - params.height - dpToPx(16));
-                    homeY = params.y;
                 }
 
                 // Klavye küçültme özelliği aktifse boyutu da küçült
@@ -143,13 +144,14 @@ public class FloatingService extends Service {
                     params.height = sizePx;
                     params.x = clamp(params.x, 0, screenW - sizePx);
                     params.y = clamp(params.y, 0, visibleBottom - sizePx - dpToPx(8));
-                    homeY = params.y;
                 }
+
+                homeX = params.x;
+                homeY = params.y;
             } else {
                 // Klavye kapandı — eski Y konumuna dön
                 if (savedYBeforeKb >= 0) {
                     params.y = savedYBeforeKb;
-                    homeY    = savedYBeforeKb;
                     savedYBeforeKb = -1;
                 }
 
@@ -160,13 +162,40 @@ public class FloatingService extends Service {
                     params.height = sizePx;
                     params.x = clamp(params.x, 0, screenW - sizePx);
                     params.y = clamp(params.y, 0, screenH - sizePx);
-                    homeY = params.y;
                 }
+
+                homeX = params.x;
+                homeY = params.y;
             }
 
             try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
         }
     };
+
+    private void syncKeyboardState() {
+        NavService nav = NavService.getInstance();
+        if (nav == null) return;
+        boolean nowVisible = false;
+        int nowHeight = 0;
+        try {
+            List<android.view.accessibility.AccessibilityWindowInfo> wins = nav.getWindows();
+            if (wins != null) for (android.view.accessibility.AccessibilityWindowInfo w : wins) {
+                if (w.getType() == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD) {
+                    nowVisible = true;
+                    android.graphics.Rect r = new android.graphics.Rect();
+                    w.getBoundsInScreen(r);
+                    nowHeight = r.height();
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+        if (nowVisible != keyboardVisible) {
+            Intent fake = new Intent(nowVisible ? ACTION_KEYBOARD_SHOW : ACTION_KEYBOARD_HIDE);
+            fake.setPackage(getPackageName());
+            if (nowVisible && nowHeight > 0) fake.putExtra("kb_height", nowHeight);
+            keyboardReceiver.onReceive(this, fake);
+        }
+    }
 
     private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ctx, Intent i) {
@@ -305,6 +334,7 @@ public class FloatingService extends Service {
             private final Paint iconPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Paint badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Paint badgeTxt   = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint linePaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
             {
                 setLayerType(LAYER_TYPE_SOFTWARE, null);
                 stylePaint.setStyle(Paint.Style.STROKE);
@@ -456,6 +486,90 @@ public class FloatingService extends Service {
                         c.drawCircle(cx, cy, r * 0.12f, fillPaint);
                         break;
                     }
+                    case SettingsManager.STYLE_SOLID: {
+                        // Solid semi-transparent fill + thin border
+                        fillPaint.setColor(Color.argb(70, Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+                        c.drawCircle(cx, cy, r, fillPaint);
+                        stylePaint.setMaskFilter(null);
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setStrokeWidth(2f);
+                        stylePaint.setAlpha(200);
+                        c.drawCircle(cx, cy, r - 1f, stylePaint);
+                        break;
+                    }
+                    case SettingsManager.STYLE_HALO: {
+                        // Three concentric rings: inner crisp, middle medium, outer blur
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setMaskFilter(null);
+                        stylePaint.setStrokeWidth(2.5f); stylePaint.setAlpha(255);
+                        c.drawCircle(cx, cy, r * 0.55f, stylePaint);
+                        stylePaint.setStrokeWidth(1.5f); stylePaint.setAlpha(160);
+                        c.drawCircle(cx, cy, r * 0.78f, stylePaint);
+                        stylePaint.setMaskFilter(new BlurMaskFilter(r * 0.18f, BlurMaskFilter.Blur.NORMAL));
+                        stylePaint.setStrokeWidth(1f); stylePaint.setAlpha(90);
+                        c.drawCircle(cx, cy, r - 1f, stylePaint);
+                        break;
+                    }
+                    case SettingsManager.STYLE_COMET: {
+                        // Two arcs (top-right and bottom-left), creating a yin-yang feel
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setMaskFilter(null);
+                        stylePaint.setStrokeWidth(3f); stylePaint.setAlpha(230);
+                        RectF oval = new RectF(cx - r + 2f, cy - r + 2f, cx + r - 2f, cy + r - 2f);
+                        c.drawArc(oval, -50f, 170f, false, stylePaint);
+                        stylePaint.setAlpha(120);
+                        c.drawArc(oval, 130f, 170f, false, stylePaint);
+                        // center dot
+                        fillPaint.setColor(drawColor); fillPaint.setAlpha(200);
+                        c.drawCircle(cx, cy, r * 0.1f, fillPaint);
+                        break;
+                    }
+                    case SettingsManager.STYLE_DOTRING: {
+                        // Ring of small dots
+                        fillPaint.setColor(drawColor);
+                        int dots = 12;
+                        float dotR = r * 0.09f;
+                        for (int d = 0; d < dots; d++) {
+                            double angle = (2 * Math.PI * d / dots) - Math.PI / 2;
+                            float dotX = (float)(cx + (r - dotR * 2) * Math.cos(angle));
+                            float dotY = (float)(cy + (r - dotR * 2) * Math.sin(angle));
+                            fillPaint.setAlpha(d % 2 == 0 ? 230 : 100);
+                            c.drawCircle(dotX, dotY, dotR, fillPaint);
+                        }
+                        break;
+                    }
+                    case SettingsManager.STYLE_FILNEON: {
+                        // Solid fill + strong neon outer glow (most visible style)
+                        fillPaint.setColor(Color.argb(50, Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+                        c.drawCircle(cx, cy, r, fillPaint);
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setMaskFilter(new BlurMaskFilter(r * 0.55f, BlurMaskFilter.Blur.NORMAL));
+                        stylePaint.setStrokeWidth(4f); stylePaint.setAlpha(255);
+                        c.drawCircle(cx, cy, r * 0.75f, stylePaint);
+                        stylePaint.setMaskFilter(null);
+                        stylePaint.setStrokeWidth(1.5f); stylePaint.setAlpha(255);
+                        stylePaint.setColor(0xFFFFFFFF);
+                        c.drawCircle(cx, cy, r - 1f, stylePaint);
+                        break;
+                    }
+                    case SettingsManager.STYLE_CROSS: {
+                        // Center dot + 4 tick marks (like a crosshair/target)
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setMaskFilter(null);
+                        stylePaint.setStrokeWidth(1.5f); stylePaint.setAlpha(180);
+                        c.drawCircle(cx, cy, r - 1f, stylePaint); // outer ring
+                        fillPaint.setColor(drawColor); fillPaint.setAlpha(220);
+                        c.drawCircle(cx, cy, r * 0.08f, fillPaint); // center dot
+                        linePaint.setColor(drawColor); linePaint.setAlpha(220);
+                        linePaint.setStyle(Paint.Style.STROKE);
+                        linePaint.setStrokeWidth(2f); linePaint.setStrokeCap(Paint.Cap.ROUND);
+                        float tick = r * 0.28f;
+                        c.drawLine(cx, cy - r + 3f, cx, cy - r + 3f + tick, linePaint); // top
+                        c.drawLine(cx, cy + r - 3f - tick, cx, cy + r - 3f, linePaint); // bottom
+                        c.drawLine(cx - r + 3f, cy, cx - r + 3f + tick, cy, linePaint); // left
+                        c.drawLine(cx + r - 3f - tick, cy, cx + r - 3f, cy, linePaint); // right
+                        break;
+                    }
                 }
             }
 
@@ -547,6 +661,7 @@ public class FloatingService extends Service {
     private boolean handleTouch(MotionEvent e) {
         switch (e.getAction()) {
             case MotionEvent.ACTION_DOWN: {
+                syncKeyboardState();
                 dX = params.x - e.getRawX(); dY = params.y - e.getRawY();
                 startX = (int) e.getRawX(); startY = (int) e.getRawY();
                 moved = false; longPressActive = false;
