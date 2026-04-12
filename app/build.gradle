@@ -10,8 +10,8 @@ android {
         applicationId "com.touchnav.app"
         minSdkVersion 23
         targetSdkVersion 34
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
     }
 
     compileOptions {
@@ -19,10 +19,31 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
+    signingConfigs {
+        release {
+            def ksPath  = System.getenv("KEYSTORE_PATH")  ?: ""
+            def ksPass  = System.getenv("STORE_PASSWORD") ?: ""
+            def kAlias  = System.getenv("KEY_ALIAS")      ?: ""
+            def kPass   = System.getenv("KEY_PASSWORD")   ?: ""
+            if (ksPath) {
+                storeFile     file(ksPath)
+                storePassword ksPass
+                keyAlias      kAlias
+                keyPassword   kPass
+            } else {
+                // Fallback: debug keystore (local builds)
+                storeFile     signingConfigs.debug.storeFile
+                storePassword signingConfigs.debug.storePassword
+                keyAlias      signingConfigs.debug.keyAlias
+                keyPassword   signingConfigs.debug.keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
         debug {
             applicationIdSuffix ""

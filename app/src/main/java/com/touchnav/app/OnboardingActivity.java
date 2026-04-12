@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.animation.OvershootInterpolator;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class OnboardingActivity extends Activity {
 
@@ -51,8 +52,8 @@ public class OnboardingActivity extends Activity {
 
     /** Her adımın gerçek durumunu kontrol et */
     private void refreshStepStatus() {
-        // Adım 0: Kısıtlı Ayarlar — programatik kontrol mümkün değil,
-        //         kullanıcı butona bastıysa tamamlandı sayılır (stepDone[0] zaten set)
+        // Adım 0: Ekran üstü izni — programatik kontrol mümkün
+        stepDone[0] = Settings.canDrawOverlays(this);
         // Adım 1: Erişilebilirlik
         stepDone[1] = (NavService.getInstance() != null);
         // Adım 2: Arka plan
@@ -151,23 +152,36 @@ public class OnboardingActivity extends Activity {
             .setInterpolator(new OvershootInterpolator(0.7f)).start();
     }
 
-    // ── Adım 0: Kısıtlı Ayarlar ─────────────────────────────────
+    // ── Adım 0: Ekran Üstü İzni ──────────────────────────────────
     private void buildStepRestricted() {
-        addTitle(L.isTr() ? "Kısıtlı Ayarlar" : "Restricted Settings");
+        boolean canOverlay = Settings.canDrawOverlays(this);
+        stepDone[0] = canOverlay;
+
+        addTitle(L.isTr() ? "Ekran Üstü İzni" : "Overlay Permission");
         addSub(L.isTr()
-            ? "Erişilebilirlik iznine ulaşmak için önce\nuygulamayı kısıtlı ayarlardan aç."
-            : "To reach Accessibility, first allow\nrestricted settings for this app.");
+            ? "TouchNav'ın diğer uygulamaların\nüzerinde görünmesi için bu izni ver."
+            : "Allow TouchNav to appear\nover other applications.");
 
-        addStatusChip(stepDone[0],
-            L.isTr() ? "✓ Tamamlandı" : "✓ Done",
-            L.isTr() ? "Uygulama Bilgisi'ni aç → gerekli" : "Open App Info → required");
+        addStatusChip(canOverlay,
+            canOverlay ? (L.isTr() ? "✓ İzin Verildi" : "✓ Permission Granted")
+                       : (L.isTr() ? "✕ İzin Gerekli" : "✕ Permission Required"),
+            canOverlay ? (L.isTr() ? "Hazır, devam edebilirsin" : "Ready, you can proceed")
+                       : (L.isTr() ? "Diğer uyg. üzerinde göster → zorunlu" : "Draw over other apps → required"));
 
-        addActionBtn(
-            L.isTr() ? "Uygulama Bilgisi'ni Aç →" : "Open App Info →",
-            () -> {
-                stepDone[0] = true;
-                openAppInfo();
-            });
+        if (!canOverlay) {
+            addActionBtn(
+                L.isTr() ? "İzni Ver →" : "Grant Permission →",
+                () -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            startActivityForResult(
+                                new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:" + getPackageName())),
+                                REQ_OVERLAY);
+                        } catch (Exception e) { openAppInfo(); }
+                    }
+                });
+        }
     }
 
     // ── Adım 1: Erişilebilirlik ──────────────────────────────────
@@ -359,6 +373,22 @@ public class OnboardingActivity extends Activity {
     // ── Navigasyon ───────────────────────────────────────────────
     private void onNextClick() {
         refreshStepStatus();
+        // Adım 0: ekran üstü izni olmadan devam edemez (uygulama çalışmaz)
+        if (currentPage == 0 && !stepDone[0]) {
+            Toast.makeText(this,
+                L.isTr() ? "Ekran üstü izni olmadan uygulama çalışmaz!"
+                         : "App cannot work without overlay permission!",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // Adım 1: erişilebilirlik olmadan nav tuşları çalışmaz
+        if (currentPage == 1 && !stepDone[1]) {
+            Toast.makeText(this,
+                L.isTr() ? "Erişilebilirlik henüz aktif değil!"
+                         : "Accessibility not enabled yet!",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (currentPage < 3) showPage(currentPage + 1);
         else finishOnboarding();
     }

@@ -34,7 +34,42 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      - name: Setup signing keystore
+        id: signing
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+            echo "store_pass=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_OUTPUT
+            echo "key_alias=${{ secrets.KEY_ALIAS }}"       >> $GITHUB_OUTPUT
+            echo "key_pass=${{ secrets.KEY_PASSWORD }}"     >> $GITHUB_OUTPUT
+            echo "ks_path=${{ github.workspace }}/keystore.jks" >> $GITHUB_OUTPUT
+            echo "✅ Keystore restored from secret."
+          else
+            echo "⚠️  KEYSTORE_BASE64 secret not found — generating a new keystore."
+            echo "   This run will succeed but future installs over existing APKs will fail."
+            echo "   To fix: copy the base64 output below into GitHub Secrets as KEYSTORE_BASE64"
+            echo "   and add STORE_PASSWORD=touchnav2024, KEY_ALIAS=touchnav, KEY_PASSWORD=touchnav2024"
+            keytool -genkey -v \
+              -keystore keystore.jks \
+              -alias touchnav \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass touchnav2024 -keypass touchnav2024 \
+              -dname "CN=TouchNav, OU=Dev, O=TouchNav, L=TR, S=TR, C=TR"
+            echo "=== KEYSTORE BASE64 (save as KEYSTORE_BASE64 secret) ==="
+            base64 keystore.jks
+            echo "========================================================"
+            echo "store_pass=touchnav2024" >> $GITHUB_OUTPUT
+            echo "key_alias=touchnav"      >> $GITHUB_OUTPUT
+            echo "key_pass=touchnav2024"   >> $GITHUB_OUTPUT
+            echo "ks_path=${{ github.workspace }}/keystore.jks" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build Release APK
+        env:
+          KEYSTORE_PATH: ${{ steps.signing.outputs.ks_path }}
+          STORE_PASSWORD: ${{ steps.signing.outputs.store_pass }}
+          KEY_ALIAS: ${{ steps.signing.outputs.key_alias }}
+          KEY_PASSWORD: ${{ steps.signing.outputs.key_pass }}
         run: ./gradlew assembleRelease
 
       - name: Get version name
@@ -62,6 +97,9 @@ jobs:
             1. APK'yı indir
             2. Telefon Ayarları → Güvenlik → Bilinmeyen Kaynaklar'ı aç
             3. İndirilen APK'yı çalıştır
+
+            **Güncelleme:**
+            - Eski sürüm kuruluysa direkt üstüne kur, çakışma olmaz.
           files: release/TouchNav-v${{ steps.version.outputs.version }}.apk
           draft: false
           prerelease: false
