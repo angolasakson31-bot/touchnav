@@ -891,26 +891,14 @@ public class FloatingService extends Service {
     }
 
     private void launchAssistant() {
-        // Önce kullanıcının ayarladığı asistan uygulamasını dene
-        String assistantPkg = settings.getAssistantApp();
-        if (assistantPkg != null && !assistantPkg.isEmpty()) {
-            try {
-                Intent i = getPackageManager().getLaunchIntentForPackage(assistantPkg);
-                if (i != null) {
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(i);
-                    return;
-                }
-            } catch (Exception ignored) {}
-        }
         // Sistem sesli asistanını tetikle (Google Assistant, Bixby, vs.)
         try {
-            Intent i = new Intent(Intent.ACTION_VOICE_COMMAND);
+            Intent i = new Intent("android.intent.action.ASSIST");
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
         } catch (Exception e1) {
             try {
-                Intent i = new Intent("android.intent.action.ASSIST");
+                Intent i = new Intent(Intent.ACTION_VOICE_COMMAND);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(i);
             } catch (Exception ignored) {}
