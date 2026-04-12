@@ -621,7 +621,7 @@ public class SettingsActivity extends Activity {
         String[] modes=L.isTr()
             ? new String[]{"Sohbet / Metin (uygulamayı aç)","Sesli sohbet (mikrofon ile başlat)"}
             : new String[]{"Chat / Text (open app)","Voice chat (start with microphone)"};
-        addSpinner(card,null,null,modes,settings.getAssistantMode(),v->settings.setAssistantMode(v));
+        addSpinner(card,null,null,modes,settings.getAssistantMode(),v->{settings.setAssistantMode(v);buildCards();});
 
         // Sesli mod notu
         if (settings.getAssistantMode()==SettingsManager.ASSISTANT_MODE_VOICE) {
@@ -643,37 +643,37 @@ public class SettingsActivity extends Activity {
         } catch (Exception e) { return pkg; }
     }
 
-    /** Tüm asistan adaylarını döndürür: launcher + ASSIST + VOICE_COMMAND intenti destekleyenler */
+    /**
+     * Telefondaki tüm açılabilir uygulamaları döndürür.
+     * getInstalledApplications kullanır — QUERY_ALL_PACKAGES izni manifest'te olmalı.
+     * Kullanıcı uygulamaları önce (ada göre), sistem uygulamaları arkada.
+     */
     private List<AppItem> getAllAssistantApps() {
         PackageManager pm=getPackageManager();
-        Set<String> seen=new HashSet<>();
-        List<AppItem> user=new ArrayList<>(), sys=new ArrayList<>(), extras=new ArrayList<>();
+        List<android.content.pm.ApplicationInfo> installed;
+        try {
+            installed=pm.getInstalledApplications(PackageManager.GET_META_DATA);
+        } catch (Exception e) { installed=new ArrayList<>(); }
 
-        // 1. Tüm launcher uygulamaları
-        Intent launcher=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        for (ResolveInfo ri:pm.queryIntentActivities(launcher,0)) {
-            String pkg=ri.activityInfo.packageName;
-            if (pkg.equals(getPackageName())||!seen.add(pkg)) continue;
-            boolean isSys=(ri.activityInfo.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM)!=0
-                &&(ri.activityInfo.applicationInfo.flags&ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)==0;
-            AppItem item=new AppItem(ri.loadLabel(pm).toString(),pkg,ri.loadIcon(pm));
+        List<AppItem> user=new ArrayList<>(), sys=new ArrayList<>();
+        for (android.content.pm.ApplicationInfo ai:installed) {
+            if (ai.packageName.equals(getPackageName())) continue;
+            // Açılabilir mi? (launch intent yoksa gösterme)
+            Intent launch=pm.getLaunchIntentForPackage(ai.packageName);
+            if (launch==null) continue;
+            String name;
+            try { name=pm.getApplicationLabel(ai).toString(); } catch (Exception e) { continue; }
+            android.graphics.drawable.Drawable icon;
+            try { icon=pm.getApplicationIcon(ai.packageName); } catch (Exception e) { continue; }
+            boolean isSys=(ai.flags&ApplicationInfo.FLAG_SYSTEM)!=0
+                        &&(ai.flags&ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)==0;
+            AppItem item=new AppItem(name,ai.packageName,icon);
             if (isSys) sys.add(item); else user.add(item);
-        }
-        // 2. ASSIST intent destekleyenler (launcher'da görünmeyebilir)
-        for (Intent qi:new Intent[]{
-                new Intent("android.intent.action.ASSIST"),
-                new Intent(Intent.ACTION_VOICE_COMMAND)}) {
-            for (ResolveInfo ri:pm.queryIntentActivities(qi,0)) {
-                String pkg=ri.activityInfo.packageName;
-                if (pkg.equals(getPackageName())||!seen.add(pkg)) continue;
-                extras.add(new AppItem(ri.loadLabel(pm).toString(),pkg,ri.loadIcon(pm)));
-            }
         }
         Collections.sort(user,(a,b)->a.name.compareToIgnoreCase(b.name));
         Collections.sort(sys,(a,b)->a.name.compareToIgnoreCase(b.name));
-        Collections.sort(extras,(a,b)->a.name.compareToIgnoreCase(b.name));
         List<AppItem> result=new ArrayList<>(user);
-        result.addAll(extras); result.addAll(sys);
+        result.addAll(sys);
         return result;
     }
 

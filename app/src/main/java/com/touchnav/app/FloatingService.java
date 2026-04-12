@@ -912,33 +912,69 @@ public class FloatingService extends Service {
         startAssistIntent();
     }
 
-    /** Sesli mod: mikrofonu doğrudan başlat */
+    /**
+     * Sesli mod — öncelik sırası:
+     * 1. Bilinen asistan uygulamaları için özel sesli intent (Google, Bixby, Alexa, vb.)
+     * 2. Seçili uygulama var ama sesli intent yoksa: uygulamayı normal aç
+     * 3. Seçili uygulama yok: sistem asistanı sesli modda (ACTION_ASSIST)
+     */
     private void launchAssistantVoice(String pkg) {
-        // 1. Bilinen asistanlar için özel sesli intent
         if (pkg != null && !pkg.isEmpty()) {
-            try {
-                Intent voice = null;
-                if (pkg.startsWith("com.google.android")) {
-                    // Google Assistant sesli modda aç
-                    voice = new Intent("android.intent.action.VOICE_COMMAND");
-                } else if (pkg.contains("bixby") || pkg.contains("svoice")) {
-                    // Samsung Bixby
-                    voice = new Intent("com.samsung.android.bixby.agent.OPEN_BIXBY");
-                } else if (pkg.contains("alexa") || pkg.contains("amazon")) {
-                    voice = new Intent("com.amazon.alexa.action.ACTIVATE_ALEXA_VOICE");
-                }
-                if (voice != null) {
+            // Paket adına göre bilinen sesli intent dene
+            Intent voice = knownVoiceIntent(pkg);
+            if (voice != null) {
+                try {
                     voice.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(voice);
                     return;
-                }
-                // Bilinen değil: uygulama açık, sesli mod desteklemiyorsa normal aç
+                } catch (Exception ignored) {}
+            }
+            // Bilinen sesli intent yok — uygulamayı normal aç (ChatGPT, Gemini, vb.)
+            try {
                 Intent normal = getPackageManager().getLaunchIntentForPackage(pkg);
-                if (normal != null) { normal.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(normal); return; }
+                if (normal != null) {
+                    normal.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(normal);
+                    return;
+                }
             } catch (Exception ignored) {}
         }
-        // 2. Sistem asistanı sesli mod (ACTION_ASSIST her zaman sesli başlar)
+        // Seçili uygulama yok veya açılamadı: sistem sesli asistanı
         startAssistIntent();
+    }
+
+    /**
+     * Paket adına göre sesli başlatma intenti döndürür.
+     * Desteklenenler: Google, Bixby, Alexa, Cortana, Siri (iOS yok ama bilinsin).
+     * Null dönerse uygulamanın sesli intent'i bilinmiyor demektir.
+     */
+    private Intent knownVoiceIntent(String pkg) {
+        // Google Assistant / Google Search / Google app
+        if (pkg.equals("com.google.android.googlequicksearchbox")
+                || pkg.equals("com.google.android.apps.googleassistant")
+                || pkg.equals("com.google.android.assistant")) {
+            Intent i = new Intent("android.intent.action.VOICE_COMMAND");
+            i.setPackage(pkg);
+            return i;
+        }
+        // Samsung Bixby
+        if (pkg.equals("com.samsung.android.bixby.agent")
+                || pkg.contains("bixby") || pkg.contains("svoice")) {
+            Intent i = new Intent("com.samsung.android.bixby.agent.OPEN_BIXBY");
+            return i;
+        }
+        // Amazon Alexa
+        if (pkg.equals("com.amazon.dee.app") || pkg.contains("alexa")) {
+            Intent i = new Intent("com.amazon.alexa.action.ACTIVATE_ALEXA_VOICE");
+            return i;
+        }
+        // Microsoft Cortana
+        if (pkg.contains("cortana") || pkg.contains("microsoft.launcher")) {
+            Intent i = new Intent(Intent.ACTION_VOICE_COMMAND);
+            i.setPackage(pkg);
+            return i;
+        }
+        return null; // bilinmiyor
     }
 
     private void startAssistIntent() {
