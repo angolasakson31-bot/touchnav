@@ -891,20 +891,62 @@ public class FloatingService extends Service {
     }
 
     private void launchAssistant() {
-        // Kullanıcının seçtiği asistan uygulamasını aç
-        String pkg = settings.getAssistantApp();
+        String pkg  = settings.getAssistantApp();
+        int    mode = settings.getAssistantMode();
+        if (mode == SettingsManager.ASSISTANT_MODE_VOICE) {
+            launchAssistantVoice(pkg);
+        } else {
+            launchAssistantChat(pkg);
+        }
+    }
+
+    /** Sohbet/metin modu: uygulamayı normal aç */
+    private void launchAssistantChat(String pkg) {
         if (pkg != null && !pkg.isEmpty()) {
             try {
                 Intent i = getPackageManager().getLaunchIntentForPackage(pkg);
                 if (i != null) { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); return; }
             } catch (Exception ignored) {}
         }
-        // Varsayılan: sistem asistanı (Google Assistant, Bixby, vs.)
+        // Fallback: sistem asistanı
+        startAssistIntent();
+    }
+
+    /** Sesli mod: mikrofonu doğrudan başlat */
+    private void launchAssistantVoice(String pkg) {
+        // 1. Bilinen asistanlar için özel sesli intent
+        if (pkg != null && !pkg.isEmpty()) {
+            try {
+                Intent voice = null;
+                if (pkg.startsWith("com.google.android")) {
+                    // Google Assistant sesli modda aç
+                    voice = new Intent("android.intent.action.VOICE_COMMAND");
+                } else if (pkg.contains("bixby") || pkg.contains("svoice")) {
+                    // Samsung Bixby
+                    voice = new Intent("com.samsung.android.bixby.agent.OPEN_BIXBY");
+                } else if (pkg.contains("alexa") || pkg.contains("amazon")) {
+                    voice = new Intent("com.amazon.alexa.action.ACTIVATE_ALEXA_VOICE");
+                }
+                if (voice != null) {
+                    voice.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(voice);
+                    return;
+                }
+                // Bilinen değil: uygulama açık, sesli mod desteklemiyorsa normal aç
+                Intent normal = getPackageManager().getLaunchIntentForPackage(pkg);
+                if (normal != null) { normal.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(normal); return; }
+            } catch (Exception ignored) {}
+        }
+        // 2. Sistem asistanı sesli mod (ACTION_ASSIST her zaman sesli başlar)
+        startAssistIntent();
+    }
+
+    private void startAssistIntent() {
         try {
             Intent i = new Intent("android.intent.action.ASSIST");
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception e1) {
+        } catch (Exception e) {
             try {
                 Intent i = new Intent(Intent.ACTION_VOICE_COMMAND);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

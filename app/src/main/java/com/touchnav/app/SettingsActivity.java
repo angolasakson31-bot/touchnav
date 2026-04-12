@@ -582,37 +582,103 @@ public class SettingsActivity extends Activity {
 
     private void buildAssistantGestureCard() {
         LinearLayout card=makeCard(L.cardAssistant(),
-            L.isTr()?"Harekete atanan asistan aksiyonu hangi uygulamayı açacak?"
-                    :"Which app should the Assistant gesture action open?");
-        // Seçili uygulama butonu
+            L.isTr()?"Asistan hareketi için uygulama ve başlatma modunu seç."
+                    :"Choose app and launch mode for the Assistant gesture.");
+
+        // ── Uygulama seçimi ───────────────────────────────────────
         String savedPkg=settings.getAssistantApp();
-        String btnText;
-        if (savedPkg!=null&&!savedPkg.isEmpty()) {
-            try {
-                btnText=getPackageManager().getApplicationLabel(
-                    getPackageManager().getApplicationInfo(savedPkg,0)).toString();
-            } catch (Exception e) { btnText=savedPkg; }
-        } else {
-            btnText=L.isTr()?"Sistem asistanı (varsayılan)":"System assistant (default)";
-        }
-        TextView btn=new TextView(this);
-        btn.setText(btnText);
-        btn.setTextColor(savedPkg!=null&&!savedPkg.isEmpty()?accent():sub());
-        btn.setTextSize(13); btn.setPadding(0,px(8),0,px(4));
-        btn.setOnClickListener(v->{haptic(v);showAssistantPicker(btn);});
-        card.addView(btn);
-        // Sıfırla butonu
+        String appName=appNameForPkg(savedPkg);
+        TextView appLabel=new TextView(this);
+        appLabel.setText(L.isTr()?"Uygulama:  ":"App:  ");
+        appLabel.setTextColor(sub()); appLabel.setTextSize(12);
+        appLabel.setPadding(0,px(8),0,0); card.addView(appLabel);
+
+        TextView appBtn=new TextView(this);
+        appBtn.setText(appName);
+        appBtn.setTextColor(savedPkg!=null&&!savedPkg.isEmpty()?accent():sub());
+        appBtn.setTextSize(14); appBtn.setPadding(px(8),px(4),px(8),px(4));
+        GradientDrawable ab=new GradientDrawable(); ab.setCornerRadius(px(8));
+        ab.setColor(t()==1?0x18000000:0x22FFFFFF); ab.setStroke(px(1),border());
+        appBtn.setBackground(ab);
+        appBtn.setOnClickListener(v->{haptic(v);showAssistantPicker(appBtn);});
+        card.addView(appBtn);
+
+        // Sıfırla
         if (savedPkg!=null&&!savedPkg.isEmpty()) {
             TextView reset=new TextView(this);
-            reset.setText(L.isTr()?"Sıfırla (sistem asistanı)":"Reset (system assistant)");
-            reset.setTextColor(0xFFEF5350); reset.setTextSize(12); reset.setPadding(0,px(4),0,0);
+            reset.setText(L.isTr()?"↺  Sistem asistanına sıfırla":"↺  Reset to system assistant");
+            reset.setTextColor(0xFFEF5350); reset.setTextSize(12); reset.setPadding(0,px(6),0,px(2));
             reset.setOnClickListener(v->{haptic(v);settings.setAssistantApp("");buildCards();});
             card.addView(reset);
         }
+
+        // ── Başlatma modu ─────────────────────────────────────────
+        TextView modeLabel=new TextView(this);
+        modeLabel.setText(L.isTr()?"Başlatma modu:":"Launch mode:");
+        modeLabel.setTextColor(sub()); modeLabel.setTextSize(12);
+        modeLabel.setPadding(0,px(14),0,px(4)); card.addView(modeLabel);
+
+        String[] modes=L.isTr()
+            ? new String[]{"Sohbet / Metin (uygulamayı aç)","Sesli sohbet (mikrofon ile başlat)"}
+            : new String[]{"Chat / Text (open app)","Voice chat (start with microphone)"};
+        addSpinner(card,null,null,modes,settings.getAssistantMode(),v->settings.setAssistantMode(v));
+
+        // Sesli mod notu
+        if (settings.getAssistantMode()==SettingsManager.ASSISTANT_MODE_VOICE) {
+            TextView note=new TextView(this);
+            note.setText(L.isTr()
+                ?"Not: Uygulama seçilmemişse sistem asistanı sesli açılır.\nUygulama seçilmişse önce o açılır (desteklemiyorsa sesli mod devreye girer)."
+                :"Note: If no app selected, system assistant opens in voice mode.\nIf an app is selected, it opens first (voice mode activates as fallback).");
+            note.setTextColor(sub()); note.setTextSize(11); note.setPadding(0,px(8),0,0);
+            card.addView(note);
+        }
     }
 
-    private void showAssistantPicker(TextView btn) {
-        List<AppItem> apps=getLauncherApps(); int count=apps.size();
+    private String appNameForPkg(String pkg) {
+        if (pkg==null||pkg.isEmpty())
+            return L.isTr()?"Sistem asistanı (varsayılan)":"System assistant (default)";
+        try {
+            return getPackageManager().getApplicationLabel(
+                getPackageManager().getApplicationInfo(pkg,0)).toString();
+        } catch (Exception e) { return pkg; }
+    }
+
+    /** Tüm asistan adaylarını döndürür: launcher + ASSIST + VOICE_COMMAND intenti destekleyenler */
+    private List<AppItem> getAllAssistantApps() {
+        PackageManager pm=getPackageManager();
+        Set<String> seen=new HashSet<>();
+        List<AppItem> user=new ArrayList<>(), sys=new ArrayList<>(), extras=new ArrayList<>();
+
+        // 1. Tüm launcher uygulamaları
+        Intent launcher=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        for (ResolveInfo ri:pm.queryIntentActivities(launcher,0)) {
+            String pkg=ri.activityInfo.packageName;
+            if (pkg.equals(getPackageName())||!seen.add(pkg)) continue;
+            boolean isSys=(ri.activityInfo.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM)!=0
+                &&(ri.activityInfo.applicationInfo.flags&ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)==0;
+            AppItem item=new AppItem(ri.loadLabel(pm).toString(),pkg,ri.loadIcon(pm));
+            if (isSys) sys.add(item); else user.add(item);
+        }
+        // 2. ASSIST intent destekleyenler (launcher'da görünmeyebilir)
+        for (Intent qi:new Intent[]{
+                new Intent("android.intent.action.ASSIST"),
+                new Intent(Intent.ACTION_VOICE_COMMAND)}) {
+            for (ResolveInfo ri:pm.queryIntentActivities(qi,0)) {
+                String pkg=ri.activityInfo.packageName;
+                if (pkg.equals(getPackageName())||!seen.add(pkg)) continue;
+                extras.add(new AppItem(ri.loadLabel(pm).toString(),pkg,ri.loadIcon(pm)));
+            }
+        }
+        Collections.sort(user,(a,b)->a.name.compareToIgnoreCase(b.name));
+        Collections.sort(sys,(a,b)->a.name.compareToIgnoreCase(b.name));
+        Collections.sort(extras,(a,b)->a.name.compareToIgnoreCase(b.name));
+        List<AppItem> result=new ArrayList<>(user);
+        result.addAll(extras); result.addAll(sys);
+        return result;
+    }
+
+    private void showAssistantPicker(TextView appBtn) {
+        List<AppItem> apps=getAllAssistantApps(); int count=apps.size();
         String[] names=new String[count+1];
         names[0]=L.isTr()?"Sistem asistanı (varsayılan)":"System assistant (default)";
         for(int i=0;i<count;i++) names[i+1]=apps.get(i).name;
@@ -620,11 +686,11 @@ public class SettingsActivity extends Activity {
             .setItems(names,(d,w)->{
                 if(w==0){
                     settings.setAssistantApp("");
-                    btn.setText(names[0]); btn.setTextColor(sub());
+                    appBtn.setText(names[0]); appBtn.setTextColor(sub());
                 } else {
                     String pkg=apps.get(w-1).pkg;
                     settings.setAssistantApp(pkg);
-                    btn.setText(apps.get(w-1).name); btn.setTextColor(accent());
+                    appBtn.setText(apps.get(w-1).name); appBtn.setTextColor(accent());
                 }
                 buildCards();
             }).setNegativeButton(L.cancel(),null).show();

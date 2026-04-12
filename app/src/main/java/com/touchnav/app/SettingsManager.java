@@ -148,8 +148,12 @@ public class SettingsManager {
     public void setIdleAlphaTime(int v) { prefs.edit().putInt("idle_alpha_time", v).apply(); }
 
     // ── Asistan aksiyonu ─────────────────────────────────────────
+    public static final int ASSISTANT_MODE_CHAT  = 0;  // Uygulamayı normal aç (metin/sohbet)
+    public static final int ASSISTANT_MODE_VOICE = 1;  // Sesli konuşma modunu başlat
     public String getAssistantApp() { return prefs.getString("assistant_app_pkg", ""); }
     public void setAssistantApp(String pkg) { prefs.edit().putString("assistant_app_pkg", pkg).apply(); }
+    public int getAssistantMode() { return prefs.getInt("assistant_launch_mode", ASSISTANT_MODE_CHAT); }
+    public void setAssistantMode(int v) { prefs.edit().putInt("assistant_launch_mode", v).apply(); }
 
     // ── Otomatik gizle ───────────────────────────────────────────
     public String getHidePackages() { return prefs.getString("hide_packages", ""); }
