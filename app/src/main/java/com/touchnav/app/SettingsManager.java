@@ -147,6 +147,10 @@ public class SettingsManager {
     public int getIdleAlphaTime() { return prefs.getInt("idle_alpha_time", 3000); }
     public void setIdleAlphaTime(int v) { prefs.edit().putInt("idle_alpha_time", v).apply(); }
 
+    // ── Asistan aksiyonu ─────────────────────────────────────────
+    public String getAssistantApp() { return prefs.getString("assistant_app_pkg", ""); }
+    public void setAssistantApp(String pkg) { prefs.edit().putString("assistant_app_pkg", pkg).apply(); }
+
     // ── Otomatik gizle ───────────────────────────────────────────
     public String getHidePackages() { return prefs.getString("hide_packages", ""); }
     public void setHidePackages(String v) { prefs.edit().putString("hide_packages", v).apply(); }

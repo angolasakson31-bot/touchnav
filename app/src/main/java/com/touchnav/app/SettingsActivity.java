@@ -50,15 +50,6 @@ public class SettingsActivity extends Activity {
         0xFF90A4AE, 0xFFFFCC02, 0xFFFF7043, 0xFF26C6DA
     };
 
-    private static final String[] ACTIONS_TR = {
-        "Geri","İleri","Ana Ekran","Son Uygulamalar",
-        "Bildirimler","Uygulama Çekmecesi","Hiçbir şey","Ekran Kaydı","Şeffaflık"
-    };
-    private static final String[] ACTIONS_EN = {
-        "Back","Forward","Home","Recents",
-        "Notifications","App Drawer","None","Screen Record","Transparency"
-    };
-
     private List<AppItem> cachedApps = null;
 
     static class AppItem {
@@ -308,12 +299,13 @@ public class SettingsActivity extends Activity {
         buildOptionsCard();
         buildGesturesCard();
         buildDrawCard();
+        if (anyGestureIsAssistant()) buildAssistantGestureCard();
         buildKeyboardCard();
         buildBatteryCard();
         buildNotifCard();
     }
 
-    private String[] actions() { return L.isTr()?ACTIONS_TR:ACTIONS_EN; }
+    private String[] actions() { return L.actionLabels(); }
 
     private void buildLanguageCard() {
         LinearLayout card=makeCard(L.language(),null);
@@ -493,8 +485,8 @@ public class SettingsActivity extends Activity {
 
     private void buildTransparencyCard() {
         LinearLayout card=makeCard(L.cardTransparency(),
-            L.isTr()?"Bir harekete 'Şeffaflık' atandığında butonu geçici gizler. Fotoğraf çekerken kullanışlı."
-                    :"When 'Transparency' is assigned to a gesture, temporarily hides the button.");
+            L.isTr()?"Bir harekete 'Gizlilik' atandığında buton tamamen kaybolur, dokunulamaz. Fotoğraf çekerken kullanışlı."
+                    :"When 'Privacy' is assigned to a gesture, button becomes fully invisible and untouchable.");
         addToggle(card,L.transparencyToggle(),
             L.isTr()?"Harekete atanabilmesi için açık olmalı.":"Must be on to assign to a gesture.",
             settings.isTransparencyShortcut(),v->{settings.setTransparencyShortcut(v);sendRefresh();});
@@ -576,7 +568,66 @@ public class SettingsActivity extends Activity {
                 case 2:settings.setSwipeRight(pos);break; case 3:settings.setSwipeLeft(pos);break;
                 case 4:settings.setSwipeUp(pos);break; case 5:settings.setSwipeDown(pos);break;
             }
+            buildCards();
         });}
+    }
+
+    private boolean anyGestureIsAssistant() {
+        int A=SettingsManager.ACTION_ASSISTANT;
+        return settings.getSingleTap()==A||settings.getDoubleTap()==A||
+               settings.getSwipeRight()==A||settings.getSwipeLeft()==A||
+               settings.getSwipeUp()==A||settings.getSwipeDown()==A||
+               settings.getDrawGestureL()==A||settings.getDrawGestureZ()==A;
+    }
+
+    private void buildAssistantGestureCard() {
+        LinearLayout card=makeCard(L.cardAssistant(),
+            L.isTr()?"Harekete atanan asistan aksiyonu hangi uygulamayı açacak?"
+                    :"Which app should the Assistant gesture action open?");
+        // Seçili uygulama butonu
+        String savedPkg=settings.getAssistantApp();
+        String btnText;
+        if (savedPkg!=null&&!savedPkg.isEmpty()) {
+            try {
+                btnText=getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(savedPkg,0)).toString();
+            } catch (Exception e) { btnText=savedPkg; }
+        } else {
+            btnText=L.isTr()?"Sistem asistanı (varsayılan)":"System assistant (default)";
+        }
+        TextView btn=new TextView(this);
+        btn.setText(btnText);
+        btn.setTextColor(savedPkg!=null&&!savedPkg.isEmpty()?accent():sub());
+        btn.setTextSize(13); btn.setPadding(0,px(8),0,px(4));
+        btn.setOnClickListener(v->{haptic(v);showAssistantPicker(btn);});
+        card.addView(btn);
+        // Sıfırla butonu
+        if (savedPkg!=null&&!savedPkg.isEmpty()) {
+            TextView reset=new TextView(this);
+            reset.setText(L.isTr()?"Sıfırla (sistem asistanı)":"Reset (system assistant)");
+            reset.setTextColor(0xFFEF5350); reset.setTextSize(12); reset.setPadding(0,px(4),0,0);
+            reset.setOnClickListener(v->{haptic(v);settings.setAssistantApp("");buildCards();});
+            card.addView(reset);
+        }
+    }
+
+    private void showAssistantPicker(TextView btn) {
+        List<AppItem> apps=getLauncherApps(); int count=apps.size();
+        String[] names=new String[count+1];
+        names[0]=L.isTr()?"Sistem asistanı (varsayılan)":"System assistant (default)";
+        for(int i=0;i<count;i++) names[i+1]=apps.get(i).name;
+        new AlertDialog.Builder(this).setTitle(L.assistantApp())
+            .setItems(names,(d,w)->{
+                if(w==0){
+                    settings.setAssistantApp("");
+                    btn.setText(names[0]); btn.setTextColor(sub());
+                } else {
+                    String pkg=apps.get(w-1).pkg;
+                    settings.setAssistantApp(pkg);
+                    btn.setText(apps.get(w-1).name); btn.setTextColor(accent());
+                }
+                buildCards();
+            }).setNegativeButton(L.cancel(),null).show();
     }
 
     private void buildDrawCard() {
@@ -588,8 +639,8 @@ public class SettingsActivity extends Activity {
             settings.isDrawGestureEnabled(),v->{settings.setDrawGestureEnabled(v);sendRefresh();buildCards();});
         if (!settings.isDrawGestureEnabled()) return;
         String[] a=actions();
-        addSpinner(card,L.lShape(),null,a,settings.getDrawGestureL(),v->settings.setDrawGestureL(v));
-        addSpinner(card,L.zShape(),null,a,settings.getDrawGestureZ(),v->settings.setDrawGestureZ(v));
+        addSpinner(card,L.lShape(),null,a,settings.getDrawGestureL(),v->{settings.setDrawGestureL(v);buildCards();});
+        addSpinner(card,L.zShape(),null,a,settings.getDrawGestureZ(),v->{settings.setDrawGestureZ(v);buildCards();});
     }
 
     private void buildKeyboardCard() {
