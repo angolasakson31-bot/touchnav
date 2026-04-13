@@ -637,6 +637,72 @@ public class FloatingService extends Service {
                         c.drawLine(cx + r - 3f - tick, cy, cx + r - 3f, cy, linePaint); // right
                         break;
                     }
+                    case SettingsManager.STYLE_IPHONE: {
+                        // iPhone home indicator: horizontal rounded pill
+                        float pillW = r * 0.65f;
+                        float pillH = r * 0.18f;
+                        fillPaint.setColor(Color.argb(200,
+                            Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+                        RectF iPhonePill = new RectF(cx - pillW, cy - pillH, cx + pillW, cy + pillH);
+                        c.drawRoundRect(iPhonePill, pillH, pillH, fillPaint);
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setMaskFilter(new BlurMaskFilter(r * 0.12f, BlurMaskFilter.Blur.NORMAL));
+                        stylePaint.setStrokeWidth(1f); stylePaint.setAlpha(70);
+                        c.drawRoundRect(iPhonePill, pillH, pillH, stylePaint);
+                        stylePaint.setMaskFilter(null);
+                        break;
+                    }
+                    case SettingsManager.STYLE_MATERIAL3: {
+                        // Material You: tonal filled circle with soft elevation + top highlight
+                        stylePaint.setStyle(Paint.Style.FILL);
+                        stylePaint.setMaskFilter(new BlurMaskFilter(r * 0.3f, BlurMaskFilter.Blur.NORMAL));
+                        stylePaint.setColor(Color.argb(70, 0, 0, 0));
+                        c.drawCircle(cx, cy + r * 0.1f, r * 0.85f, stylePaint);
+                        stylePaint.setMaskFilter(null);
+                        fillPaint.setColor(Color.argb(210,
+                            Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+                        c.drawCircle(cx, cy, r * 0.88f, fillPaint);
+                        fillPaint.setColor(0x28FFFFFF);
+                        c.drawCircle(cx - r * 0.2f, cy - r * 0.25f, r * 0.38f, fillPaint);
+                        break;
+                    }
+                    case SettingsManager.STYLE_FLUENT: {
+                        // Windows 11 Fluent: acrylic tint + light-source arc
+                        fillPaint.setColor(Color.argb(55,
+                            Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+                        c.drawCircle(cx, cy, r, fillPaint);
+                        fillPaint.setColor(0x14FFFFFF);
+                        c.drawCircle(cx, cy, r * 0.82f, fillPaint);
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setMaskFilter(new BlurMaskFilter(r * 0.1f, BlurMaskFilter.Blur.NORMAL));
+                        stylePaint.setStrokeWidth(1.5f); stylePaint.setAlpha(140);
+                        c.drawCircle(cx, cy, r - 1f, stylePaint);
+                        stylePaint.setMaskFilter(null);
+                        stylePaint.setStrokeWidth(1f); stylePaint.setAlpha(210);
+                        stylePaint.setColor(0xFFFFFFFF);
+                        RectF fluentOval = new RectF(cx - r + 2f, cy - r + 2f, cx + r - 2f, cy + r - 2f);
+                        c.drawArc(fluentOval, 200f, 130f, false, stylePaint);
+                        break;
+                    }
+                    case SettingsManager.STYLE_BUBBLE: {
+                        // Glass bubble: deep fill + inner glow + top specular highlight
+                        fillPaint.setColor(Color.argb(160,
+                            Color.red(drawColor), Color.green(drawColor), Color.blue(drawColor)));
+                        c.drawCircle(cx, cy, r, fillPaint);
+                        stylePaint.setStyle(Paint.Style.FILL);
+                        stylePaint.setMaskFilter(new BlurMaskFilter(r * 0.45f, BlurMaskFilter.Blur.NORMAL));
+                        stylePaint.setColor(drawColor); stylePaint.setAlpha(110);
+                        c.drawCircle(cx, cy, r * 0.5f, stylePaint);
+                        stylePaint.setMaskFilter(null);
+                        fillPaint.setColor(0x45FFFFFF);
+                        c.drawCircle(cx - r * 0.22f, cy - r * 0.28f, r * 0.35f, fillPaint);
+                        stylePaint.setStyle(Paint.Style.STROKE);
+                        stylePaint.setStrokeWidth(1f); stylePaint.setAlpha(90);
+                        stylePaint.setColor(0xFFFFFFFF);
+                        c.drawCircle(cx, cy, r - 0.5f, stylePaint);
+                        break;
+                    }
+
                 }
             }
 
