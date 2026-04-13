@@ -303,6 +303,7 @@ public class SettingsActivity extends Activity {
         buildKeyboardCard();
         buildBatteryCard();
         buildNotifCard();
+        buildCompatCard();
     }
 
     private String[] actions() { return L.actionLabels(); }
@@ -477,8 +478,8 @@ public class SettingsActivity extends Activity {
         LinearLayout card=makeCard(L.cardAppearance(),
             L.isTr()?"Butonun opaklığını ve boyutunu ayarlar. Değişiklikler anlık yansır."
                     :"Adjusts button opacity and size. Changes apply live.");
-        addSlider(card,L.opacity(),L.isTr()?"Düşük = daha şeffaf.":"Lower = more transparent.",
-            20,100,(int)(settings.getOpacity()*100),"%",v->{settings.setOpacity(v/100f);sendRefresh();});
+        addSlider(card,L.opacity(),L.isTr()?"Düşük = daha şeffaf. (5% çok saydam)":"Lower = more transparent. (5% nearly invisible)",
+            5,100,(int)(settings.getOpacity()*100),"%",v->{settings.setOpacity(v/100f);sendRefresh();});
         addSlider(card,L.size(),L.isTr()?"Butonun ekrandaki boyutu (dp).":"Button size on screen (dp).",
             40,140,settings.getSize(),"dp",v->{settings.setSize(v);sendRefresh();});
     }
@@ -754,6 +755,13 @@ public class SettingsActivity extends Activity {
         card.addView(note);
     }
 
+    private void buildCompatCard() {
+        LinearLayout card=makeCard(L.cardCompat(),L.compatInfo());
+        addToggle(card,L.compatToggle(),null,settings.isCompatMode(),v->{
+            settings.setCompatMode(v); sendRefresh();
+        });
+    }
+
     // ── Önizleme çizimleri ─────────────────────────────────────────
     private View makeStylePreview(int style, int color) {
         final int c=color;
@@ -771,64 +779,22 @@ public class SettingsActivity extends Activity {
                 Path clip=new Path(); clip.addCircle(cx,cy,r,Path.Direction.CW); cv.clipPath(clip);
                 switch(style){
                     case 0:{rP.setStrokeWidth(1.8f);rP.setMaskFilter(null);rP.setAlpha(130);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 1:{fP.setColor(0x22FFFFFF);cv.drawCircle(cx,cy,r,fP);rP.setStrokeWidth(2f);rP.setMaskFilter(null);rP.setAlpha(190);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 2:{rP.setMaskFilter(new BlurMaskFilter(r*.35f,BlurMaskFilter.Blur.OUTER));rP.setStrokeWidth(2.5f);rP.setAlpha(200);cv.drawCircle(cx,cy,r*.7f,rP);rP.setMaskFilter(null);rP.setStrokeWidth(1.5f);rP.setAlpha(160);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 3:{float d=r*.3f;dP.setPathEffect(new DashPathEffect(new float[]{d,d*.55f},0));dP.setStrokeWidth(2.2f);dP.setAlpha(190);cv.drawCircle(cx,cy,r-1,dP);break;}
-                    case 4:{for(int k=0;k<3;k++){rP.setMaskFilter(new BlurMaskFilter(r*(0.6f-k*.15f),BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(3f-k*.5f);rP.setAlpha(200-k*40);cv.drawCircle(cx,cy,r-1,rP);}rP.setMaskFilter(null);rP.setStrokeWidth(1f);rP.setAlpha(255);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 5:{fP.setColor(Color.argb(40,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setStrokeWidth(2f);rP.setMaskFilter(null);rP.setAlpha(200);cv.drawCircle(cx,cy,r-1,rP);fP.setColor(0x18FFFFFF);cv.drawCircle(cx,cy-r*.18f,r*.42f,fP);break;}
-                    case 6:{rP.setMaskFilter(new BlurMaskFilter(r*.22f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(2f);rP.setAlpha(180);cv.drawCircle(cx,cy,r*.9f,rP);rP.setMaskFilter(null);rP.setAlpha(220);cv.drawCircle(cx,cy,r*.55f,rP);break;}
-                    case 7:{fP.setColor(Color.argb(70,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setMaskFilter(null);rP.setStrokeWidth(2f);rP.setAlpha(200);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 8:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(2.5f);rP.setAlpha(255);cv.drawCircle(cx,cy,r*.55f,rP);rP.setStrokeWidth(1.5f);rP.setAlpha(160);cv.drawCircle(cx,cy,r*.78f,rP);rP.setMaskFilter(new BlurMaskFilter(r*.18f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(1f);rP.setAlpha(90);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 9:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(3f);rP.setAlpha(230);RectF ov=new RectF(cx-r+2f,cy-r+2f,cx+r-2f,cy+r-2f);cv.drawArc(ov,-50f,170f,false,rP);rP.setAlpha(120);cv.drawArc(ov,130f,170f,false,rP);fP.setColor(c);fP.setAlpha(200);cv.drawCircle(cx,cy,r*.1f,fP);break;}
-                    case 10:{fP.setColor(c);int dots=12;float dotR=r*.09f;for(int d2=0;d2<dots;d2++){double ang=(2*Math.PI*d2/dots)-Math.PI/2;float dx=(float)(cx+(r-dotR*2)*Math.cos(ang));float dy=(float)(cy+(r-dotR*2)*Math.sin(ang));fP.setAlpha(d2%2==0?230:100);cv.drawCircle(dx,dy,dotR,fP);}break;}
-                    case 11:{fP.setColor(Color.argb(50,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(new BlurMaskFilter(r*.55f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(4f);rP.setAlpha(255);cv.drawCircle(cx,cy,r*.75f,rP);rP.setMaskFilter(null);rP.setStrokeWidth(1.5f);rP.setAlpha(255);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-1,rP);break;}
-                    case 12:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(1.5f);rP.setAlpha(180);cv.drawCircle(cx,cy,r-1,rP);fP.setColor(c);fP.setAlpha(220);cv.drawCircle(cx,cy,r*.08f,fP);Paint lp2=new Paint(Paint.ANTI_ALIAS_FLAG);lp2.setColor(c);lp2.setAlpha(220);lp2.setStyle(Paint.Style.STROKE);lp2.setStrokeWidth(2f);lp2.setStrokeCap(Paint.Cap.ROUND);float tk=r*.28f;cv.drawLine(cx,cy-r+3f,cx,cy-r+3f+tk,lp2);cv.drawLine(cx,cy+r-3f-tk,cx,cy+r-3f,lp2);cv.drawLine(cx-r+3f,cy,cx-r+3f+tk,cy,lp2);cv.drawLine(cx+r-3f-tk,cy,cx+r-3f,cy,lp2);break;}
-                    case 13:{float pw=r*.65f,ph=r*.18f;fP.setColor(Color.argb(200,Color.red(c),Color.green(c),Color.blue(c)));cv.drawRoundRect(new RectF(cx-pw,cy-ph,cx+pw,cy+ph),ph,ph,fP);break;}
-                    case 14:{rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.3f,BlurMaskFilter.Blur.NORMAL));rP.setColor(Color.argb(70,0,0,0));cv.drawCircle(cx,cy+r*.1f,r*.85f,rP);rP.setMaskFilter(null);fP.setColor(Color.argb(210,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r*.88f,fP);fP.setColor(0x28FFFFFF);cv.drawCircle(cx-r*.2f,cy-r*.25f,r*.38f,fP);break;}
-                    case 15:{fP.setColor(Color.argb(55,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);fP.setColor(0x14FFFFFF);cv.drawCircle(cx,cy,r*.82f,fP);rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(new BlurMaskFilter(r*.1f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(1.5f);rP.setAlpha(140);cv.drawCircle(cx,cy,r-1f,rP);rP.setMaskFilter(null);rP.setStrokeWidth(1f);rP.setAlpha(210);rP.setColor(0xFFFFFFFF);cv.drawArc(new RectF(cx-r+2f,cy-r+2f,cx+r-2f,cy+r-2f),200f,130f,false,rP);break;}
-                    case 16:{fP.setColor(Color.argb(160,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r,fP);rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.45f,BlurMaskFilter.Blur.NORMAL));rP.setColor(c);rP.setAlpha(110);cv.drawCircle(cx,cy,r*.5f,rP);rP.setMaskFilter(null);fP.setColor(0x45FFFFFF);cv.drawCircle(cx-r*.22f,cy-r*.28f,r*.35f,fP);rP.setStyle(Paint.Style.STROKE);rP.setStrokeWidth(1f);rP.setAlpha(90);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-.5f,rP);break;}
+                    case 1:{rP.setMaskFilter(new BlurMaskFilter(r*.4f,BlurMaskFilter.Blur.OUTER));rP.setStrokeWidth(3f);rP.setAlpha(210);cv.drawCircle(cx,cy,r*.72f,rP);rP.setMaskFilter(null);rP.setStrokeWidth(1.5f);rP.setAlpha(160);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 2:{float d=r*.28f;dP.setPathEffect(new DashPathEffect(new float[]{d,d*.55f},0));dP.setStrokeWidth(2.2f);dP.setAlpha(190);cv.drawCircle(cx,cy,r-1,dP);break;}
+                    case 3:{for(int k=0;k<3;k++){rP.setMaskFilter(new BlurMaskFilter(r*(0.6f-k*.15f),BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(3f-k*.5f);rP.setAlpha(200-k*40);cv.drawCircle(cx,cy,r-1,rP);}rP.setMaskFilter(null);rP.setStrokeWidth(1f);rP.setAlpha(255);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 4:{rP.setMaskFilter(new BlurMaskFilter(r*.22f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(2f);rP.setAlpha(180);cv.drawCircle(cx,cy,r*.92f,rP);rP.setMaskFilter(null);rP.setAlpha(220);cv.drawCircle(cx,cy,r*.58f,rP);fP.setColor(Color.argb(160,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r*.12f,fP);break;}
+                    case 5:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(2.5f);rP.setAlpha(255);cv.drawCircle(cx,cy,r*.55f,rP);rP.setStrokeWidth(1.5f);rP.setAlpha(160);cv.drawCircle(cx,cy,r*.78f,rP);rP.setMaskFilter(new BlurMaskFilter(r*.18f,BlurMaskFilter.Blur.NORMAL));rP.setStrokeWidth(1f);rP.setAlpha(90);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 6:{rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.3f,BlurMaskFilter.Blur.NORMAL));rP.setColor(Color.argb(70,0,0,0));cv.drawCircle(cx,cy+r*.1f,r*.85f,rP);rP.setMaskFilter(null);fP.setColor(Color.argb(210,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r*.88f,fP);fP.setColor(0x28FFFFFF);cv.drawCircle(cx-r*.2f,cy-r*.25f,r*.38f,fP);break;}
+                    case 7:{rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.75f,BlurMaskFilter.Blur.NORMAL));rP.setColor(c);rP.setAlpha(230);cv.drawCircle(cx,cy,r*.58f,rP);rP.setMaskFilter(null);fP.setColor(Color.argb(210,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r*.52f,fP);break;}
+                    case 8:{rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.4f,BlurMaskFilter.Blur.OUTER));rP.setColor(c);rP.setAlpha(170);cv.drawCircle(cx,cy,r,rP);rP.setMaskFilter(null);fP.setColor(Color.argb(235,Color.red(c),Color.green(c),Color.blue(c)));cv.drawCircle(cx,cy,r-1f,fP);rP.setStyle(Paint.Style.STROKE);rP.setStrokeWidth(2.5f);rP.setAlpha(255);rP.setColor(0xFFFFFFFF);cv.drawCircle(cx,cy,r-1.5f,rP);break;}
+                    case 9:{rP.setStyle(Paint.Style.STROKE);rP.setMaskFilter(null);rP.setStrokeWidth(2f);rP.setAlpha(235);cv.drawCircle(cx,cy,r*.32f,rP);rP.setStrokeWidth(1.5f);rP.setAlpha(135);cv.drawCircle(cx,cy,r*.62f,rP);rP.setStrokeWidth(1f);rP.setAlpha(55);cv.drawCircle(cx,cy,r-1,rP);fP.setColor(c);fP.setAlpha(230);cv.drawCircle(cx,cy,r*.09f,fP);break;}
+                    case 10:{rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.35f,BlurMaskFilter.Blur.NORMAL));rP.setColor(c);rP.setAlpha(48);cv.drawCircle(cx,cy,r*.68f,rP);rP.setMaskFilter(null);rP.setStyle(Paint.Style.STROKE);rP.setStrokeWidth(1f);rP.setAlpha(38);cv.drawCircle(cx,cy,r-1,rP);break;}
+                    case 11:{rP.setStyle(Paint.Style.FILL);rP.setMaskFilter(new BlurMaskFilter(r*.82f,BlurMaskFilter.Blur.NORMAL));rP.setColor(c);rP.setAlpha(95);cv.drawCircle(cx,cy,r*.28f,rP);rP.setMaskFilter(null);fP.setColor(c);fP.setAlpha(230);cv.drawCircle(cx,cy,r*.14f,fP);break;}
+                    case 12:{fP.setColor(c);fP.setAlpha(200);float dr=r*.07f,ds=r*.76f;cv.drawCircle(cx,cy-ds,dr,fP);cv.drawCircle(cx+ds,cy,dr,fP);cv.drawCircle(cx,cy+ds,dr,fP);cv.drawCircle(cx-ds,cy,dr,fP);fP.setAlpha(120);cv.drawCircle(cx,cy,dr*.55f,fP);break;}
+                }
                 }
             }
         };
     }
 
-    private View makeShapePreview(int shape, int color) {
-        final int c=color;
-        return new View(this){
-            private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-            {setLayerType(LAYER_TYPE_SOFTWARE,null);setBackground(null);
-             p.setStyle(Paint.Style.STROKE);p.setColor(c);p.setStrokeWidth(2f);p.setAlpha(200);}
-            @Override protected void onDraw(Canvas cv){
-                float cx=getWidth()/2f,cy=getHeight()/2f,r=Math.min(cx,cy)-4f;
-                if(r<=0) return;
-                switch(shape){
-                    case 0:cv.drawCircle(cx,cy,r,p);break;
-                    case 1:cv.drawRoundRect(new RectF(cx-r,cy-r,cx+r,cy+r),r*.35f,r*.35f,p);break;
-                    case 2:{Path dp=new Path();float cr=r*.75f;dp.addOval(new RectF(cx-cr,cy-r*.8f,cx+cr,cy+cr*.4f),Path.Direction.CW);dp.moveTo(cx-cr*.55f,cy+cr*.2f);dp.lineTo(cx,cy+r);dp.lineTo(cx+cr*.55f,cy+cr*.2f);dp.close();cv.drawPath(dp,p);break;}
-                    case 3:{Path hp=new Path();for(int i=0;i<6;i++){double a=Math.PI/6+i*Math.PI/3;float x=(float)(cx+r*Math.cos(a)),y=(float)(cy+r*Math.sin(a));if(i==0)hp.moveTo(x,y);else hp.lineTo(x,y);}hp.close();cv.drawPath(hp,p);break;}
-                }
-            }
-        };
-    }
-
-    // ── Yardımcılar ──────────────────────────────────────────────
-    private void sendRefresh() {
-        Intent i=new Intent(FloatingService.ACTION_REFRESH);
-        i.setPackage(getPackageName()); sendBroadcast(i);
-    }
-
-    private void showNewProfileDialog() {
-        EditText input=new EditText(this); input.setHint(L.profileName()); input.setPadding(px(16),px(12),px(16),px(12));
-        new AlertDialog.Builder(this).setTitle(L.newProfile()).setView(input)
-            .setPositiveButton(L.save(),(d,w)->{String name=input.getText().toString().trim();
-                if(!name.isEmpty()){profiles.saveProfile(name);settings.setCurrentProfile(name);sendRefresh();buildCards();}
-            }).setNegativeButton(L.cancel(),null).show();
-    }
-
-    private void toast(String msg){ android.widget.Toast.makeText(this,msg,android.widget.Toast.LENGTH_SHORT).show(); }
-    private void haptic(View v){ v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING); }
-    private int px(int dp){ return (int)(dp*getResources().getDisplayMetrics().density); }
-
-    interface OnInt  { void on(int v); }
-    interface OnBool { void on(boolean v); }
-}
+    private View makeShapePreview
