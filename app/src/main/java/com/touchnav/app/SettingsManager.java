@@ -24,23 +24,19 @@ public class SettingsManager {
     public static final int ACTION_MAX_VALID     = 10;
 
     // ── Buton stilleri ───────────────────────────────────────────
-    public static final int STYLE_GHOST   = 0;
-    public static final int STYLE_FROST   = 1;
-    public static final int STYLE_SHADOW  = 2;
-    public static final int STYLE_MINIMAL = 3;
-    public static final int STYLE_NEON    = 4;
-    public static final int STYLE_CRYSTAL = 5;
-    public static final int STYLE_PLASMA  = 6;
-    public static final int STYLE_SOLID   = 7;
-    public static final int STYLE_HALO    = 8;
-    public static final int STYLE_COMET   = 9;
-    public static final int STYLE_DOTRING = 10;
-    public static final int STYLE_FILNEON = 11;
-    public static final int STYLE_CROSS     = 12;
-    public static final int STYLE_IPHONE    = 13;
-    public static final int STYLE_MATERIAL3 = 14;
-    public static final int STYLE_FLUENT    = 15;
-    public static final int STYLE_BUBBLE    = 16;
+    public static final int STYLE_GHOST    = 0;
+    public static final int STYLE_SHADOW   = 1;
+    public static final int STYLE_MINIMAL  = 2;
+    public static final int STYLE_NEON     = 3;
+    public static final int STYLE_PLASMA   = 4;
+    public static final int STYLE_HALO     = 5;
+    public static final int STYLE_MATERIAL = 6;
+    public static final int STYLE_GLOW     = 7;
+    public static final int STYLE_BEACON   = 8;
+    public static final int STYLE_RIPPLE   = 9;
+    public static final int STYLE_MIST     = 10;
+    public static final int STYLE_EMBER    = 11;
+    public static final int STYLE_WHISPER  = 12;
 
     // ── Buton şekilleri ──────────────────────────────────────────
     public static final int SHAPE_CIRCLE = 0;
@@ -162,6 +158,10 @@ public class SettingsManager {
     // ── Otomatik gizle ───────────────────────────────────────────
     public String getHidePackages() { return prefs.getString("hide_packages", ""); }
     public void setHidePackages(String v) { prefs.edit().putString("hide_packages", v).apply(); }
+
+    // ── Güvenli Uygulama Uyumluluk Modu ─────────────────────────
+    public boolean isCompatMode() { return prefs.getBoolean("compat_mode", false); }
+    public void setCompatMode(boolean v) { prefs.edit().putBoolean("compat_mode", v).apply(); }
 
     // ── Çizim hareketi ───────────────────────────────────────────
     public boolean isDrawGestureEnabled() { return prefs.getBoolean("draw_gesture", false); }
