@@ -76,6 +76,7 @@ public class L {
     public static String cardKeyboard()  { return s("KLAVYE", "KEYBOARD"); }
     public static String cardNotif()     { return s("BİLDİRİM ROZETİ", "NOTIFICATION BADGE"); }
     public static String cardTransparency(){ return s("GİZLİLİK KISAYOLU", "PRIVACY SHORTCUT"); }
+    public static String cardCompat()      { return s("UYUMLU ÇALIŞMA MODU", "COMPATIBILITY MODE"); }
 
     // ── Ayar etiketleri ───────────────────────────────────────────
     public static String opacity()      { return s("Opaklık", "Opacity"); }
@@ -112,6 +113,10 @@ public class L {
     public static String notifBadgeToggle(){ return s("Bildirim rozeti göster", "Show notification badge"); }
     public static String transparencyToggle(){ return s("Gizlilik kısayolu aktif", "Privacy shortcut active"); }
     public static String transparencyDur(){ return s("Gizlilik süresi", "Privacy duration"); }
+    public static String compatToggle()  { return s("Uyumlu çalışma modunu etkinleştir", "Enable compatibility mode"); }
+    public static String compatInfo()    { return s(
+        "Aktifken Play Store, bankacılık ve ödeme uygulamaları açıldığında TouchNav kendini tamamen kaldırır, sorun yaşamazsınız.",
+        "When active, TouchNav fully hides itself when Play Store, banking or payment apps open — no more freezing or blocking."); }
     public static String language()     { return s("Dil / Language", "Language / Dil"); }
 
     // ── Hareket etiketleri ───────────────────────────────────────
@@ -141,7 +146,7 @@ public class L {
 
     // ── Stil isimleri ─────────────────────────────────────────────
     public static String[] styleNames() {
-        return new String[]{"Ghost","Frost","Shadow","Minimal","Neon","Crystal","Plasma","Solid","Halo","Comet","DotRing","FillNeon","Cross","iPhone","Material","Fluent","Bubble"};
+        return new String[]{"Ghost","Shadow","Minimal","Neon","Plasma","Halo","Material","Glow","Beacon","Ripple","Mist","Ember","Whisper"};
     }
 
     // ── Şekil isimleri ────────────────────────────────────────────
