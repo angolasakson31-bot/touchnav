@@ -82,7 +82,6 @@ public class L {
     public static String opacity()      { return s("Opaklık", "Opacity"); }
     public static String size()         { return s("Boyut", "Size"); }
     public static String vibActive()    { return s("Titreşim aktif", "Vibration active"); }
-    public static String vibStrength()  { return s("Şiddet", "Strength"); }
     public static String vibDuration()  { return s("Süre", "Duration"); }
     public static String vibNote()      { return s("Erişilebilirlik servisi aktif olmalı", "Accessibility service must be active"); }
     public static String longPress()    { return s("Long press süresi", "Long press duration"); }
@@ -103,9 +102,7 @@ public class L {
     public static String drawInfo()     { return s("Parmakla L veya Z çizerek aksiyon tetikle", "Draw L or Z with finger to trigger action"); }
     public static String lShape()       { return s("L şekli aksiyonu", "L shape action"); }
     public static String zShape()       { return s("Z şekli aksiyonu", "Z shape action"); }
-    public static String assistantInfo(){ return s("Butonu uzun basılı tutunca asistan başlatılır", "Hold button to launch assistant"); }
     public static String assistantApp() { return s("Asistan uygulaması", "Assistant app"); }
-    public static String assistantHold(){ return s("Basılı tutma süresi", "Hold duration"); }
     public static String lowBattAlert() { return s("Düşük pil uyarısı", "Low battery alert"); }
     public static String battThreshold(){ return s("Uyarı eşiği (%)", "Alert threshold (%)"); }
     public static String kbShrink()     { return s("Klavye açıkken küçül", "Shrink when keyboard opens"); }
@@ -172,14 +169,6 @@ public class L {
     // ── Tema isimleri ─────────────────────────────────────────────
     public static String[] themeNames() {
         return new String[]{"Midnight", s("Açık", "Light"), "AMOLED"};
-    }
-
-    // ── Titreşim seçenekleri ──────────────────────────────────────
-    public static String[] strengthLabels() {
-        return new String[]{s("Hafif","Soft"), s("Orta","Medium"), s("Güçlü","Strong")};
-    }
-    public static String[] durationLabels() {
-        return new String[]{s("Kısa","Short"), s("Orta","Medium"), s("Uzun","Long")};
     }
 
     // ── Onboarding ────────────────────────────────────────────────
