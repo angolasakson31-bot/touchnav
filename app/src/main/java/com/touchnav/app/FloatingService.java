@@ -155,11 +155,14 @@ public class FloatingService extends Service {
                 if (kbHeight < 150 || kbHeight > screenH * 0.70f) kbHeight = (int)(screenH * 0.42f);
                 int visibleBottom = screenH - kbHeight;
 
-                // Her zaman mevcut Y konumunu kaydet
+                // Mevcut Y konumunu her zaman kaydet (klavye kapanınca geri dönmek için)
                 savedYBeforeKb = params.y;
 
-                // Her zaman klavyenin hemen üstüne taşı (koşulsuz)
-                params.y = Math.max(dpToPx(8), visibleBottom - params.height - dpToPx(16));
+                // Sadece klavye butonu kapatıyorsa yukarı taşı; zaten üstündeyse yerinde kal
+                int btnBottom = params.y + params.height;
+                if (btnBottom > visibleBottom - dpToPx(8)) {
+                    params.y = Math.max(dpToPx(8), visibleBottom - params.height - dpToPx(16));
+                }
 
                 // Klavye küçültme özelliği aktifse boyutu da küçült
                 if (settings.isKeyboardShrink()) {
