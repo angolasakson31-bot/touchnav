@@ -88,7 +88,6 @@ public class FloatingService extends Service {
     private int     currentColor;
     private int     drawColor;
     private boolean keyboardVisible    = false;
-    private int     savedYBeforeKb    = -1;  // klavye gelince eski Y konumunu sakla
     private boolean windowsDetached   = false; // overlay window tamamen kaldırıldı mı
     private int     notifCount        = 0;
     private boolean batteryLow       = false;
@@ -109,7 +108,11 @@ public class FloatingService extends Service {
 
     // ── Receivers ────────────────────────────────────────────────
     private final BroadcastReceiver stopReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context ctx, Intent i) { stopSelf(); }
+        @Override public void onReceive(Context ctx, Intent i) {
+            // Bildirimden açık durdurma — açılışta geri gelmesin
+            if (settings != null) settings.setServiceEnabled(false);
+            stopSelf();
+        }
     };
 
     private final BroadcastReceiver refreshReceiver = new BroadcastReceiver() {
@@ -155,10 +158,9 @@ public class FloatingService extends Service {
                 if (kbHeight < 150 || kbHeight > screenH * 0.70f) kbHeight = (int)(screenH * 0.42f);
                 int visibleBottom = screenH - kbHeight;
 
-                // Mevcut Y konumunu her zaman kaydet (klavye kapanınca geri dönmek için)
-                savedYBeforeKb = params.y;
-
-                // Sadece klavye butonu kapatıyorsa yukarı taşı; zaten üstündeyse yerinde kal
+                // Sadece klavye butonu kapatıyorsa yukarı taşı; zaten üstündeyse yerinde kal.
+                // NOT: Geçici taşımayı KAYITLI konuma yazmıyoruz — klavye kapanınca
+                // settings.getX/getY üzerinden kalıcı konuma dönülür (kaçan olaylara dayanıklı).
                 int btnBottom = params.y + params.height;
                 if (btnBottom > visibleBottom - dpToPx(8)) {
                     params.y = Math.max(dpToPx(8), visibleBottom - params.height - dpToPx(16));
@@ -176,20 +178,16 @@ public class FloatingService extends Service {
                 homeX = params.x;
                 homeY = params.y;
             } else {
-                // Klavye kapandı — eski Y konumuna dön
-                if (savedYBeforeKb >= 0) {
-                    params.y = savedYBeforeKb;
-                    savedYBeforeKb = -1;
-                }
-
-                // Klavye küçültme özelliği aktifse boyutu geri yükle
-                if (settings.isKeyboardShrink()) {
-                    int sizePx = dpToPx(settings.getSize());
-                    params.width  = sizePx;
-                    params.height = sizePx;
-                    params.x = clamp(params.x, 0, screenW - sizePx);
-                    params.y = clamp(params.y, 0, screenH - sizePx);
-                }
+                // Klavye kapandı — DAİMA kalıcı kayıtlı konuma dön.
+                // Geçici "savedYBeforeKb" değişkeni yerine tek doğru kaynak olan
+                // settings kullanılır: servis yeniden başlasa veya "gizle" olayı
+                // kaçsa bile buton eski yerine kendiliğinden döner ve hem X hem Y
+                // geri yüklenir (yatay sürüklenme birikmesi de önlenir).
+                int sizePx = dpToPx(settings.getSize());
+                params.width  = sizePx;
+                params.height = sizePx;
+                params.x = clamp(settings.getX(), 0, screenW - sizePx);
+                params.y = clamp(settings.getY(), 0, screenH - sizePx);
 
                 homeX = params.x;
                 homeY = params.y;
@@ -229,6 +227,7 @@ public class FloatingService extends Service {
         super.onCreate();
         sRunning  = true;
         settings  = new SettingsManager(this);
+        settings.setServiceEnabled(true); // çalışırken açık işaretle (START_STICKY geri getirsin)
         L.init(this);
         currentStyle = settings.getButtonStyle();
         currentColor = settings.getButtonColor();
@@ -277,6 +276,22 @@ public class FloatingService extends Service {
     @Override public void onConfigurationChanged(Configuration cfg) {
         super.onConfigurationChanged(cfg);
         isLandscape = cfg.orientation == Configuration.ORIENTATION_LANDSCAPE;
+
+        // Döndürme/çoklu pencere sonrası ekran ölçüleri değişir; sınır
+        // hesapları bozulmasın diye güncel metrikleri yeniden oku ve butonu
+        // yeni ekran sınırları içine al.
+        if (windowManager != null) {
+            DisplayMetrics dm = new DisplayMetrics();
+            windowManager.getDefaultDisplay().getMetrics(dm);
+            screenW = dm.widthPixels;
+            screenH = dm.heightPixels;
+            if (floatView != null && params != null && !windowsDetached) {
+                params.x = clamp(params.x, 0, screenW - params.width);
+                params.y = clamp(params.y, 0, screenH - params.height);
+                homeX = params.x; homeY = params.y;
+                try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+            }
+        }
         updateVisibility();
     }
 
@@ -1001,16 +1016,26 @@ public class FloatingService extends Service {
     private void flashButton() {
         if (floatView == null) return;
         if (flashAnimator != null) flashAnimator.cancel();
-        final int savedColor = currentColor;
+        // Geri dönülecek renk DAİMA ayarlardaki gerçek renktir. currentColor
+        // bir önceki flash animasyonu ortasında yarı-beyaz bir değer olabilir;
+        // onu okusaydık renk her hızlı dokunuşta beyaza doğru kalıcı kayardı.
+        final int baseColor = settings.getButtonColor();
         currentColor = 0xFFFFFFFF;
         updateDrawColor();
         floatView.invalidate();
-        flashAnimator = ValueAnimator.ofArgb(0xFFFFFFFF, savedColor);
+        flashAnimator = ValueAnimator.ofArgb(0xFFFFFFFF, baseColor);
         flashAnimator.setDuration(280);
         flashAnimator.addUpdateListener(va -> {
             currentColor = (int) va.getAnimatedValue();
             updateDrawColor();
             if (floatView != null) floatView.invalidate();
+        });
+        flashAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(android.animation.Animator a) {
+                currentColor = baseColor;
+                updateDrawColor();
+                if (floatView != null) floatView.invalidate();
+            }
         });
         flashAnimator.start();
         floatView.animate().scaleX(1.1f).scaleY(1.1f).setDuration(80)

@@ -10,8 +10,8 @@ android {
         applicationId "com.touchnav.app"
         minSdkVersion 23
         targetSdkVersion 34
-        versionCode 13
-        versionName "2.2"
+        versionCode 14
+        versionName "2.5"
     }
 
     compileOptions {

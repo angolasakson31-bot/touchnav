@@ -22,9 +22,12 @@ public class TouchNavWidget extends AppWidgetProvider {
     public void onReceive(Context ctx, Intent intent) {
         super.onReceive(ctx, intent);
         if (ACTION_TOGGLE.equals(intent.getAction())) {
+            SettingsManager settings = new SettingsManager(ctx);
             if (FloatingService.isRunning()) {
+                settings.setServiceEnabled(false);
                 ctx.stopService(new Intent(ctx, FloatingService.class));
             } else {
+                settings.setServiceEnabled(true);
                 Intent svc = new Intent(ctx, FloatingService.class);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                     ctx.startForegroundService(svc);

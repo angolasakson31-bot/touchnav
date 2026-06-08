@@ -207,6 +207,12 @@ public class SettingsManager {
     public boolean isOnboardingDone() { return prefs.getBoolean("onboarding_done", false); }
     public void setOnboardingDone(boolean v) { prefs.edit().putBoolean("onboarding_done", v).apply(); }
 
+    // ── Servis etkin mi (yeniden başlatmada/açılışta geri getirilsin mi) ──
+    // Kullanıcı servisi açtığında true, açıkça durdurduğunda false olur.
+    // Böylece açılışta sadece kullanıcı gerçekten istediyse servis başlar.
+    public boolean isServiceEnabled() { return prefs.getBoolean("service_enabled", false); }
+    public void setServiceEnabled(boolean v) { prefs.edit().putBoolean("service_enabled", v).apply(); }
+
     // ── Profil ───────────────────────────────────────────────────
     public String getCurrentProfile() { return prefs.getString("current_profile", "Varsayilan"); }
     public void setCurrentProfile(String v) { prefs.edit().putString("current_profile", v).apply(); }

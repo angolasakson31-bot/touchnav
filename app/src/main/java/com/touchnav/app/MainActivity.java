@@ -290,6 +290,7 @@ public class MainActivity extends Activity {
     private void setupClicks() {
         btnToggle.setOnClickListener(v -> {
             if (serviceRunning) {
+                settings.setServiceEnabled(false);
                 stopService(new Intent(MainActivity.this, FloatingService.class));
                 serviceRunning = false;
                 updateStatus();
@@ -318,6 +319,7 @@ public class MainActivity extends Activity {
     }
 
     private void startFloatingService() {
+        settings.setServiceEnabled(true);
         Intent i = new Intent(this, FloatingService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             startForegroundService(i);
