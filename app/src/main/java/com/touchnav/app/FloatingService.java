@@ -88,7 +88,8 @@ public class FloatingService extends Service {
     private int     currentColor;
     private int     drawColor;
     private boolean keyboardVisible    = false;
-    private boolean windowsDetached   = false; // overlay window tamamen kaldırıldı mı
+    private boolean viewAttached      = false; // overlay window WindowManager'a ekli mi
+    private boolean tempHidden        = false; // "Geçici Kapat" aksiyonu aktif mi
     private int     notifCount        = 0;
     private boolean batteryLow       = false;
     private boolean transparencyActive = false;
@@ -102,6 +103,8 @@ public class FloatingService extends Service {
     private       Runnable ghostRunnable       = null;
     private final Handler  transparencyHandler = new Handler();
     private       Runnable transparencyRunnable = null;
+    private final Handler  tempHideHandler     = new Handler();
+    private       Runnable tempHideRunnable    = null;
 
     private final List<float[]> touchPath = new ArrayList<>();
     private static final int PATH_MIN_DIST = 15;
@@ -285,7 +288,7 @@ public class FloatingService extends Service {
             windowManager.getDefaultDisplay().getMetrics(dm);
             screenW = dm.widthPixels;
             screenH = dm.heightPixels;
-            if (floatView != null && params != null && !windowsDetached) {
+            if (floatView != null && params != null && viewAttached) {
                 params.x = clamp(params.x, 0, screenW - params.width);
                 params.y = clamp(params.y, 0, screenH - params.height);
                 homeX = params.x; homeY = params.y;
@@ -300,7 +303,7 @@ public class FloatingService extends Service {
 
     @Override public void onDestroy() {
         sRunning = false;
-        if (floatView != null) try { windowManager.removeView(floatView); } catch (Exception ignored) {}
+        detachView();
         stopPulse();
         if (flashAnimator != null) { flashAnimator.cancel(); flashAnimator = null; }
         try { unregisterReceiver(stopReceiver);    } catch (Exception ignored) {}
@@ -314,6 +317,7 @@ public class FloatingService extends Service {
         cancelTransparencyTimer();
         longPressHandler.removeCallbacksAndMessages(null);
         ghostHandler.removeCallbacksAndMessages(null);
+        tempHideHandler.removeCallbacksAndMessages(null);
         if (torchOn) { torchOn = false; try {
             android.hardware.camera2.CameraManager cm =
                 (android.hardware.camera2.CameraManager) getSystemService(CAMERA_SERVICE);
@@ -656,12 +660,8 @@ public class FloatingService extends Service {
         homeX = params.x; homeY = params.y;
 
         floatView.setOnTouchListener((v, e) -> handleTouch(e));
-        try {
-            windowManager.addView(floatView, params);
-        } catch (Exception e) {
-            floatView = null;
-            return;
-        }
+        attachView();
+        if (!viewAttached) { floatView = null; return; }
         updateVisibility();
         startGhostTimer();
         if (settings.isPulseEnabled()) startPulse();
@@ -831,6 +831,7 @@ public class FloatingService extends Service {
             case SettingsManager.ACTION_TRANSPARENCY:  toggleTransparency(); return;
             case SettingsManager.ACTION_ASSISTANT:     launchAssistant(); return;
             case SettingsManager.ACTION_TORCH:         toggleTorch(); return;
+            case SettingsManager.ACTION_HIDE_TEMP:     hideTemporarily(); return;
             case SettingsManager.ACTION_NONE: return;
         }
         NavService nav = NavService.getInstance();
@@ -1127,21 +1128,58 @@ public class FloatingService extends Service {
         anim.start();
     }
 
+    /** Overlay penceresini WindowManager'a ekler (tek giriş noktası). */
+    private void attachView() {
+        if (viewAttached || floatView == null) return;
+        try { windowManager.addView(floatView, params); viewAttached = true; }
+        catch (Exception ignored) {}
+    }
+
+    /** Overlay penceresini tamamen kaldırır — güvenli ekranlarda dokunma engeli kalkar. */
+    private void detachView() {
+        if (!viewAttached || floatView == null) return;
+        try { windowManager.removeView(floatView); } catch (Exception ignored) {}
+        viewAttached = false;
+    }
+
     private void updateVisibility() {
         if (floatView == null) return;
-        if (hiddenByPkg) {
-            // Overlay penceresini tamamen kaldır — Play Store/banka donma sorunu çözülür
-            if (!windowsDetached) {
-                try { windowManager.removeView(floatView); } catch (Exception ignored) {}
-                windowsDetached = true;
-            }
+        // Pencereyi tamamen kaldırmamız gereken durumlar:
+        //  • hiddenByPkg : Uyumlu mod, Play Store/banka gibi güvenli uygulama açık
+        //  • tempHidden  : Kullanıcı "Geçici Kapat" hareketini tetikledi
+        if (hiddenByPkg || tempHidden) {
+            detachView();
         } else {
-            if (windowsDetached) {
-                try { windowManager.addView(floatView, params); } catch (Exception ignored) {}
-                windowsDetached = false;
-            }
-            floatView.setVisibility(isLandscape ? View.GONE : View.VISIBLE);
+            attachView();
+            if (viewAttached) floatView.setVisibility(isLandscape ? View.GONE : View.VISIBLE);
         }
+    }
+
+    // ── Geçici tamamen kapat ─────────────────────────────────────
+    /**
+     * Butonu (overlay penceresini) tamamen kaldırır; Google Play, banka ve
+     * ödeme ekranlarında Android'in dokunma engeli devre dışı kalır.
+     * Ayarlanan süre sonunda buton kendiliğinden geri gelir.
+     */
+    private void hideTemporarily() {
+        if (floatView == null) return;
+        cancelGhostTimer();
+        cancelTransparencyTimer();
+        if (tempHideRunnable != null) tempHideHandler.removeCallbacks(tempHideRunnable);
+
+        tempHidden = true;
+        updateVisibility(); // pencereyi kaldırır
+
+        tempHideRunnable = () -> {
+            tempHidden = false;
+            updateVisibility(); // pencereyi geri ekler (hiddenByPkg değilse)
+            if (floatView != null) {
+                floatView.setAlpha(settings.getOpacity());
+                floatView.invalidate();
+            }
+            startGhostTimer();
+        };
+        tempHideHandler.postDelayed(tempHideRunnable, settings.getTempHideDuration());
     }
 
     // ── Bildirim ─────────────────────────────────────────────────

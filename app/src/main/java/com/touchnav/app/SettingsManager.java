@@ -20,8 +20,9 @@ public class SettingsManager {
     public static final int ACTION_TRANSPARENCY  = 8;
     public static final int ACTION_ASSISTANT     = 9;
     public static final int ACTION_TORCH         = 10;
+    public static final int ACTION_HIDE_TEMP     = 11;  // butonu tamamen kapatıp N sn sonra geri getir
     /** Maksimum geçerli aksiyon indeksi — spinner clamp için */
-    public static final int ACTION_MAX_VALID     = 10;
+    public static final int ACTION_MAX_VALID     = 11;
 
     // ── Buton stilleri ───────────────────────────────────────────
     public static final int STYLE_GHOST    = 0;
@@ -104,6 +105,12 @@ public class SettingsManager {
     public void setTransparencyShortcut(boolean v) { prefs.edit().putBoolean("transparency_shortcut", v).apply(); }
     public int getTransparencyDuration() { return prefs.getInt("transparency_duration", 5000); }
     public void setTransparencyDuration(int v) { prefs.edit().putInt("transparency_duration", v).apply(); }
+
+    // ── Geçici tamamen kapatma ───────────────────────────────────
+    // Butonu (overlay penceresini) tamamen kaldırır; Google Play/banka
+    // ekranlarında dokunma engeli kalkar. N saniye sonra kendiliğinden geri gelir.
+    public int getTempHideDuration() { return prefs.getInt("temp_hide_duration", 8000); }
+    public void setTempHideDuration(int v) { prefs.edit().putInt("temp_hide_duration", v).apply(); }
 
     // ── Nabız / Flash ────────────────────────────────────────────
     public boolean isPulseEnabled() { return prefs.getBoolean("pulse", false); }

@@ -294,6 +294,7 @@ public class SettingsActivity extends Activity {
         buildIconCard();
         buildAppearanceCard();
         buildTransparencyCard();
+        buildTempHideCard();
         buildVibrationCard();
         buildTimingCard();
         buildOptionsCard();
@@ -494,6 +495,18 @@ public class SettingsActivity extends Activity {
         addSliderF(card,L.transparencyDur(),
             L.isTr()?"Bu kadar saniye sonra buton tekrar görünür olur.":"Button reappears after this many seconds.",
             1f,30f,1f,settings.getTransparencyDuration()/1000f,"s",v->settings.setTransparencyDuration(v));
+    }
+
+    private void buildTempHideCard() {
+        LinearLayout card=makeCard(L.cardTempHide(),L.tempHideInfo());
+        TextView note=new TextView(this);
+        note.setText(L.isTr()
+            ?"Kullanmak için: HAREKETLER bölümünde bir harekete (ör. Yukarı kaydır) 'Geçici Kapat' ata."
+            :"To use: assign 'Temporarily Close' to a gesture (e.g. Swipe up) in the GESTURES section.");
+        note.setTextColor(sub()); note.setTextSize(11); note.setPadding(0,0,0,px(10)); card.addView(note);
+        addSliderF(card,L.tempHideDur(),
+            L.isTr()?"Buton bu kadar saniye TAMAMEN kapalı kalır, sonra geri gelir.":"Button stays FULLY closed for this many seconds, then returns.",
+            3f,60f,1f,settings.getTempHideDuration()/1000f,"s",v->settings.setTempHideDuration(v));
     }
 
     private void buildVibrationCard() {
