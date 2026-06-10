@@ -131,7 +131,7 @@ public class SettingsManager {
 
     // Klavye üst çizgisi ile butonun altı arasındaki boşluk, nominal mm (0–30).
     // Nominal: dp tabanlı sabit çevrim — her telefonda aynı görsel boşluk.
-    public int getKbGapMm() { return Math.max(0, Math.min(30, prefs.getInt("kb_gap_mm", 10))); }
+    public int getKbGapMm() { return Math.max(0, Math.min(30, prefs.getInt("kb_gap_mm", 3))); }
     public void setKbGapMm(int v) { prefs.edit().putInt("kb_gap_mm", Math.max(0, Math.min(30, v))).apply(); }
     public int getKeyboardShrinkSize() { return prefs.getInt("keyboard_shrink_size", 40); }
     public void setKeyboardShrinkSize(int v) { prefs.edit().putInt("keyboard_shrink_size", v).apply(); }
