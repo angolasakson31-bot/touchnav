@@ -112,6 +112,7 @@ public class L {
     public static String battThreshold(){ return s("Uyarı eşiği (%)", "Alert threshold (%)"); }
     public static String kbShrink()     { return s("Klavye açıkken küçül", "Shrink when keyboard opens"); }
     public static String kbMoveAbove()  { return s("Klavye altında kalınca üstüne taşı", "Move above keyboard when covered"); }
+    public static String kbGap()        { return s("Klavye üstü boşluk", "Gap above keyboard"); }
     public static String kbSize()       { return s("Klavye modunda boyut", "Size in keyboard mode"); }
     public static String notifBadgeToggle(){ return s("Bildirim rozeti göster", "Show notification badge"); }
     public static String transparencyToggle(){ return s("Gizlilik kısayolu aktif", "Privacy shortcut active"); }

@@ -174,10 +174,9 @@ public class FloatingService extends Service {
                     params.height = sizePx;
                 }
 
-                // "Nohut" boşluğu: klavyenin üst sınır çizgisi ile butonun altı
-                // arasında fiziksel ~8mm — dp değil mm, böylece her ekran
-                // yoğunluğunda aynı gerçek boyutta görünür.
-                int gap = mmToPx(8f);
+                // Klavye üstü boşluk: klavyenin üst sınır çizgisi ile butonun
+                // altı arasındaki mesafe — ayarlardan mm olarak seçilir.
+                int gap = nominalMmToPx(settings.getKbGapMm());
                 if (settings.isKeyboardMoveAbove()) {
                     // SADECE buton klavyenin altında kalıyorsa ya da üst sınıra
                     // nohut boşluğundan fazla yaklaşmışsa taşı; klavyeden uzaktaysa
@@ -1218,10 +1217,14 @@ public class FloatingService extends Service {
     }
 
     private int dpToPx(int dp) { return (int)(dp * getResources().getDisplayMetrics().density); }
-    /** Fiziksel milimetreyi piksele çevirir — "nohut boyu" gibi gerçek dünya boşlukları için. */
-    private int mmToPx(float mm) {
-        return (int) android.util.TypedValue.applyDimension(
-            android.util.TypedValue.COMPLEX_UNIT_MM, mm, getResources().getDisplayMetrics());
+    /**
+     * "Nominal" milimetre → piksel: 1mm = 6.3dp sabitiyle dp tabanlı çevrim.
+     * TypedValue'nun gerçek MM birimi, cihazların sık sık yanlış bildirdiği
+     * xdpi değerine dayanır ve telefondan telefona bambaşka boşluk üretir;
+     * dp tabanlı çevrim her cihazda öngörülebilir aynı görsel boşluğu verir.
+     */
+    private int nominalMmToPx(float mm) {
+        return (int)(mm * 160f / 25.4f * getResources().getDisplayMetrics().density);
     }
     private static int clamp(int v, int mn, int mx) { return Math.max(mn, Math.min(mx, v)); }
 }

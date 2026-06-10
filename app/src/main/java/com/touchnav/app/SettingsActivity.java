@@ -736,9 +736,13 @@ public class SettingsActivity extends Activity {
             L.isTr()?"Klavye davranışları: buton klavyenin tam üstüne taşınabilir ve/veya küçülebilir. Klavye kapanınca buton eski yerine ve boyutuna döner. Erişilebilirlik gerekir."
                     :"Keyboard behaviors: button can move right above the keyboard and/or shrink. It returns to its place and size when keyboard closes. Requires Accessibility.");
         addToggle(card,L.kbMoveAbove(),
-            L.isTr()?"Buton klavyenin altında kalacaksa, klavyenin üst sınır çizgisinden bir nohut boyu (~8mm) yukarıya taşınır; klavyeden uzaktaysa yerinde kalır. Klavye kapanınca eski yerine döner."
-                    :"If the keyboard would cover the button, it moves to one chickpea (~8mm) above the keyboard's top edge; if it's already clear, it stays put. Returns to its place when the keyboard closes.",
-            settings.isKeyboardMoveAbove(),v->{settings.setKeyboardMoveAbove(v);sendRefresh();});
+            L.isTr()?"Buton klavyenin altında kalacaksa, klavyenin üst sınır çizgisinden aşağıda seçtiğin boşluk kadar yukarıya taşınır; klavyeden uzaktaysa yerinde kalır. Klavye kapanınca eski yerine döner."
+                    :"If the keyboard would cover the button, it moves above the keyboard's top edge by the gap you pick below; if it's already clear, it stays put. Returns to its place when the keyboard closes.",
+            settings.isKeyboardMoveAbove(),v->{settings.setKeyboardMoveAbove(v);sendRefresh();buildCards();});
+        if (settings.isKeyboardMoveAbove())
+            addSlider(card,L.kbGap(),
+                L.isTr()?"Taşınınca butonun altı ile klavyenin üst çizgisi arasındaki boşluk. 0 = bitişik, 10 = bir parmak boyu.":"Gap between the button's bottom and the keyboard's top edge when moved. 0 = touching, 10 = about a finger width.",
+                0,30,settings.getKbGapMm(),"mm",v->settings.setKbGapMm(v));
         addToggle(card,L.kbShrink(),L.isTr()?"Klavye açıkken otomatik küçültme.":"Auto-shrink when keyboard opens.",
             settings.isKeyboardShrink(),v->{settings.setKeyboardShrink(v);sendRefresh();buildCards();});
         if (!settings.isKeyboardShrink()) return;

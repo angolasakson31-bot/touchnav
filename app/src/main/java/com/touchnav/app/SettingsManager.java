@@ -124,10 +124,15 @@ public class SettingsManager {
 
     // ── Klavye altında kalınca üstüne taşı ───────────────────────
     // Açıkken: buton YALNIZCA klavyenin altında kalacaksa, klavyenin üst
-    // sınırından ~8mm (nohut boyu) yukarı taşınır; klavyeden uzaktaysa
-    // yerinde kalır. Klavye kapanınca kalıcı kayıtlı konumuna döner.
+    // sınırından "klavye üstü boşluk" kadar yukarı taşınır; klavyeden
+    // uzaktaysa yerinde kalır. Klavye kapanınca kayıtlı konumuna döner.
     public boolean isKeyboardMoveAbove() { return prefs.getBoolean("keyboard_move_above", true); }
     public void setKeyboardMoveAbove(boolean v) { prefs.edit().putBoolean("keyboard_move_above", v).apply(); }
+
+    // Klavye üst çizgisi ile butonun altı arasındaki boşluk, nominal mm (0–30).
+    // Nominal: dp tabanlı sabit çevrim — her telefonda aynı görsel boşluk.
+    public int getKbGapMm() { return Math.max(0, Math.min(30, prefs.getInt("kb_gap_mm", 10))); }
+    public void setKbGapMm(int v) { prefs.edit().putInt("kb_gap_mm", Math.max(0, Math.min(30, v))).apply(); }
     public int getKeyboardShrinkSize() { return prefs.getInt("keyboard_shrink_size", 40); }
     public void setKeyboardShrinkSize(int v) { prefs.edit().putInt("keyboard_shrink_size", v).apply(); }
 
