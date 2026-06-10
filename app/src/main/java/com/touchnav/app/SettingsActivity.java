@@ -294,13 +294,13 @@ public class SettingsActivity extends Activity {
         buildIconCard();
         buildAppearanceCard();
         buildTransparencyCard();
-        buildTempHideCard();
         buildVibrationCard();
         buildTimingCard();
         buildOptionsCard();
         buildGesturesCard();
         buildDrawCard();
         if (anyGestureIsAssistant()) buildAssistantGestureCard();
+        if (anyGestureIsTempHide())  buildTempHideCard();
         buildKeyboardCard();
         buildBatteryCard();
         buildNotifCard();
@@ -501,9 +501,9 @@ public class SettingsActivity extends Activity {
         LinearLayout card=makeCard(L.cardTempHide(),L.tempHideInfo());
         TextView note=new TextView(this);
         note.setText(L.isTr()
-            ?"Kullanmak için: HAREKETLER bölümünde bir harekete (ör. Yukarı kaydır) 'Geçici Kapat' ata."
-            :"To use: assign 'Temporarily Close' to a gesture (e.g. Swipe up) in the GESTURES section.");
-        note.setTextColor(sub()); note.setTextSize(11); note.setPadding(0,0,0,px(10)); card.addView(note);
+            ?"✓ Bir harekete 'Geçici Kapat' atadın. Aşağıdan kapalı kalma süresini ayarla — süre dolunca buton kendiliğinden geri gelir."
+            :"✓ A gesture is set to 'Temporarily Close'. Set how long it stays closed below — the button returns by itself when time is up.");
+        note.setTextColor(accent()); note.setTextSize(11.5f); note.setPadding(0,0,0,px(10)); card.addView(note);
         addSliderF(card,L.tempHideDur(),
             L.isTr()?"Buton bu kadar saniye TAMAMEN kapalı kalır, sonra geri gelir.":"Button stays FULLY closed for this many seconds, then returns.",
             3f,60f,1f,settings.getTempHideDuration()/1000f,"s",v->settings.setTempHideDuration(v));
@@ -592,6 +592,14 @@ public class SettingsActivity extends Activity {
                settings.getSwipeRight()==A||settings.getSwipeLeft()==A||
                settings.getSwipeUp()==A||settings.getSwipeDown()==A||
                settings.getDrawGestureL()==A||settings.getDrawGestureZ()==A;
+    }
+
+    private boolean anyGestureIsTempHide() {
+        int H=SettingsManager.ACTION_HIDE_TEMP;
+        return settings.getSingleTap()==H||settings.getDoubleTap()==H||
+               settings.getSwipeRight()==H||settings.getSwipeLeft()==H||
+               settings.getSwipeUp()==H||settings.getSwipeDown()==H||
+               settings.getDrawGestureL()==H||settings.getDrawGestureZ()==H;
     }
 
     private void buildAssistantGestureCard() {
