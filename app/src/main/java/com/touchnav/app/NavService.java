@@ -1,8 +1,10 @@
 package com.touchnav.app;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
 import android.graphics.Rect;
+import android.os.Handler;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityWindowInfo;
 
@@ -16,9 +18,29 @@ public class NavService extends AccessibilityService {
     private boolean keyboardWasVisible = false;
     private int     lastKbTop          = -1;
 
+    private final Handler  kbHandler = new Handler();
+    private final Runnable kbCheck   = this::detectKeyboard;
+
     @Override
     public void onServiceConnected() {
         instance = this;
+        // KRİTİK: getWindows() bu bayrak olmadan HER ZAMAN boş liste döner —
+        // klavye penceresi asla görülemez. XML'de tanımlı ama bazı cihazlarda
+        // uygulama güncellemesi sonrası eski yapılandırma kalabildiği için
+        // çalışma zamanında da zorluyoruz.
+        try {
+            AccessibilityServiceInfo info = getServiceInfo();
+            if (info != null) {
+                info.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+                info.eventTypes |= AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                        | AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                        | AccessibilityEvent.TYPE_VIEW_FOCUSED
+                        | AccessibilityEvent.TYPE_VIEW_CLICKED;
+                setServiceInfo(info);
+            }
+        } catch (Exception ignored) {}
+        // Servis bağlanırken klavye zaten açık olabilir
+        scheduleKeyboardChecks();
     }
 
     @Override
@@ -26,19 +48,39 @@ public class NavService extends AccessibilityService {
         int type = event.getEventType();
 
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
-
-            if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    && event.getPackageName() != null) {
-                // Pencere değişimini FloatingService'e bildir (otomatik gizle)
-                Intent i = new Intent("com.touchnav.WINDOW_CHANGED");
-                i.setPackage(getPackageName()); // Android 12+ için zorunlu
-                i.putExtra("package", event.getPackageName().toString());
-                sendBroadcast(i);
-            }
-
-            detectKeyboard();
+                && event.getPackageName() != null) {
+            // Pencere değişimini FloatingService'e bildir (otomatik gizle)
+            Intent i = new Intent("com.touchnav.WINDOW_CHANGED");
+            i.setPackage(getPackageName()); // Android 12+ için zorunlu
+            i.putExtra("package", event.getPackageName().toString());
+            sendBroadcast(i);
         }
+
+        // Klavye kontrolü tetikleyicileri:
+        //  • pencere olayları: klavye penceresi eklendi/kaldırıldı
+        //  • odak/tıklama: metin kutusuna dokunuldu — bazı OEM'lerde pencere
+        //    olayı gecikir veya hiç gelmez, bu yüzden bunlar da tetikler
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                || type == AccessibilityEvent.TYPE_VIEW_FOCUSED
+                || type == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            scheduleKeyboardChecks();
+        }
+    }
+
+    /**
+     * Klavye penceresi, tetikleyici olaydan birkaç yüz ms SONRA (açılış
+     * animasyonu sırasında) pencere listesine girer/çıkar. Tek seferlik
+     * kontrol bu yüzden kaçırabilir: hemen + 250ms + 600ms sonra üç kez
+     * bakılır. Bekleyen kontroller önce iptal edilir (olay fırtınasında
+     * birikme olmaz). detectKeyboard durumu değişmedikçe yayın göndermez,
+     * dolayısıyla tekrarlı çağrı zararsızdır.
+     */
+    private void scheduleKeyboardChecks() {
+        kbHandler.removeCallbacks(kbCheck);
+        detectKeyboard();
+        kbHandler.postDelayed(kbCheck, 250);
+        kbHandler.postDelayed(kbCheck, 600);
     }
 
     /**
@@ -95,6 +137,7 @@ public class NavService extends AccessibilityService {
     @Override
     public void onDestroy() {
         instance = null;
+        kbHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 
