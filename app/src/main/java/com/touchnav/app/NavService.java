@@ -14,6 +14,7 @@ public class NavService extends AccessibilityService {
     public static NavService getInstance() { return instance; }
 
     private boolean keyboardWasVisible = false;
+    private int     lastKbTop          = -1;
 
     @Override
     public void onServiceConnected() {
@@ -42,12 +43,16 @@ public class NavService extends AccessibilityService {
 
     /**
      * Pencere listesinde TYPE_INPUT_METHOD var mı?
-     * Varsa klavye yüksekliğini (kb_height) broadcast'a ekler.
+     * Varsa klavyenin GERÇEK üst kenar koordinatını (kb_top) ve yüksekliğini
+     * (kb_height) broadcast'a ekler. kb_top, cihazdan cihaza değişen klavye
+     * boylarında tahmin yapmadan tam isabetli konumlandırma sağlar.
+     * Klavye görünür kalırken boyu değişirse (emoji paneli, sayı satırı vb.)
+     * yeniden SHOW gönderilir ki buton yeni üst kenara taşınabilsin.
      * setPackage() olmadan Android 12+'de broadcast sessizce düşer.
      */
     private void detectKeyboard() {
         boolean kbVisible = false;
-        int kbHeight = 0;
+        int kbHeight = 0, kbTop = -1;
         try {
             List<AccessibilityWindowInfo> windows = getWindows();
             if (windows != null) {
@@ -57,23 +62,31 @@ public class NavService extends AccessibilityService {
                         Rect bounds = new Rect();
                         w.getBoundsInScreen(bounds);
                         kbHeight = bounds.height();
+                        kbTop    = bounds.top;
                         break;
                     }
                 }
             }
         } catch (Exception ignored) {}
 
-        if (kbVisible != keyboardWasVisible) {
-            keyboardWasVisible = kbVisible;
-            Intent i = new Intent(kbVisible
-                ? FloatingService.ACTION_KEYBOARD_SHOW
-                : FloatingService.ACTION_KEYBOARD_HIDE);
-            i.setPackage(getPackageName()); // kritik: Android 12+
-            if (kbVisible && kbHeight > 0) {
-                i.putExtra("kb_height", kbHeight);
-            }
-            sendBroadcast(i);
+        boolean changed = (kbVisible != keyboardWasVisible);
+        // Klavye açıkken üst kenar 40px'ten fazla kaydıysa (panel değişimi) yeniden bildir
+        boolean resized = kbVisible && keyboardWasVisible
+                && lastKbTop >= 0 && kbTop >= 0 && Math.abs(kbTop - lastKbTop) > 40;
+        if (!changed && !resized) return;
+
+        keyboardWasVisible = kbVisible;
+        lastKbTop = kbVisible ? kbTop : -1;
+
+        Intent i = new Intent(kbVisible
+            ? FloatingService.ACTION_KEYBOARD_SHOW
+            : FloatingService.ACTION_KEYBOARD_HIDE);
+        i.setPackage(getPackageName()); // kritik: Android 12+
+        if (kbVisible) {
+            if (kbHeight > 0) i.putExtra("kb_height", kbHeight);
+            if (kbTop    > 0) i.putExtra("kb_top",    kbTop);
         }
+        sendBroadcast(i);
     }
 
     @Override

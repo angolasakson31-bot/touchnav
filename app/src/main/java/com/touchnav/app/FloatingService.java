@@ -150,33 +150,45 @@ public class FloatingService extends Service {
     private final BroadcastReceiver keyboardReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ctx, Intent i) {
             boolean show = ACTION_KEYBOARD_SHOW.equals(i.getAction());
-            if (keyboardVisible == show) return;
+            // Tekrarlı "gizle" olayını yok say. "Göster" olayları her zaman işlenir:
+            // klavye açıkken boyu değişirse (emoji paneli vb.) buton yeniden konumlanır.
+            if (!show && !keyboardVisible) return;
             keyboardVisible = show;
             if (floatView == null) return;
 
             if (show) {
-                // Klavye yüksekliği NavService'ten gelir; yoksa screenH'ın %42'si tahmin
-                int kbHeight = i.getIntExtra("kb_height", (int)(screenH * 0.42f));
-                // Minimum mantıklı klavye yüksekliği: 150px; maksimum ekranın %70'i
-                if (kbHeight < 150 || kbHeight > screenH * 0.70f) kbHeight = (int)(screenH * 0.42f);
-                int visibleBottom = screenH - kbHeight;
-
-                // Sadece klavye butonu kapatıyorsa yukarı taşı; zaten üstündeyse yerinde kal.
-                // NOT: Geçici taşımayı KAYITLI konuma yazmıyoruz — klavye kapanınca
-                // settings.getX/getY üzerinden kalıcı konuma dönülür (kaçan olaylara dayanıklı).
-                int btnBottom = params.y + params.height;
-                if (btnBottom > visibleBottom - dpToPx(8)) {
-                    params.y = Math.max(dpToPx(8), visibleBottom - params.height - dpToPx(16));
+                // Klavyenin üst kenarı: NavService'ten gelen GERÇEK koordinat (kb_top)
+                // en güvenilir kaynaktır — kısa/uzun, alta/üste yaslanan her klavyede
+                // tam isabet sağlar. Yoksa/saçmaysa yükseklikten tahmine düş.
+                int kbTop = i.getIntExtra("kb_top", -1);
+                if (kbTop < screenH * 0.15f || kbTop > screenH * 0.92f) {
+                    int kbHeight = i.getIntExtra("kb_height", (int)(screenH * 0.42f));
+                    if (kbHeight < 150 || kbHeight > screenH * 0.70f) kbHeight = (int)(screenH * 0.42f);
+                    kbTop = screenH - kbHeight;
                 }
 
-                // Klavye küçültme özelliği aktifse boyutu da küçült
+                // Önce boyut (küçültme açıksa) — konum hesabı yeni boyuta göre yapılır
                 if (settings.isKeyboardShrink()) {
                     int sizePx = dpToPx(settings.getKeyboardShrinkSize());
                     params.width  = sizePx;
                     params.height = sizePx;
-                    params.x = clamp(params.x, 0, screenW - sizePx);
-                    params.y = clamp(params.y, dpToPx(8), visibleBottom - sizePx - dpToPx(8));
                 }
+
+                int gap = dpToPx(8); // klavye ile buton arası boşluk — yakın ama bitişik değil
+                if (settings.isKeyboardMoveAbove()) {
+                    // X aynen korunur (son konum); Y daima klavyenin hemen üstü.
+                    params.y = Math.max(dpToPx(8), kbTop - params.height - gap);
+                } else {
+                    // Eski davranış: sadece klavye butonu kapatıyorsa yukarı taşı.
+                    int btnBottom = params.y + params.height;
+                    if (btnBottom > kbTop - gap) {
+                        params.y = Math.max(dpToPx(8), kbTop - params.height - dpToPx(16));
+                    }
+                }
+                // NOT: Geçici taşımayı KAYITLI konuma yazmıyoruz — klavye kapanınca
+                // settings.getX/getY üzerinden kalıcı konuma dönülür.
+                params.x = clamp(params.x, 0, screenW - params.width);
+                params.y = clamp(params.y, 0, screenH - params.height);
 
                 homeX = params.x;
                 homeY = params.y;

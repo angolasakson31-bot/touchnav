@@ -121,6 +121,12 @@ public class SettingsManager {
     // ── Klavye küçültme ──────────────────────────────────────────
     public boolean isKeyboardShrink() { return prefs.getBoolean("keyboard_shrink", false); }
     public void setKeyboardShrink(boolean v) { prefs.edit().putBoolean("keyboard_shrink", v).apply(); }
+
+    // ── Klavye açılınca üstüne taşı ──────────────────────────────
+    // Açıkken: buton X konumunu koruyarak klavyenin tam üst kenarına oturur,
+    // klavye kapanınca kalıcı kayıtlı konumuna döner.
+    public boolean isKeyboardMoveAbove() { return prefs.getBoolean("keyboard_move_above", true); }
+    public void setKeyboardMoveAbove(boolean v) { prefs.edit().putBoolean("keyboard_move_above", v).apply(); }
     public int getKeyboardShrinkSize() { return prefs.getInt("keyboard_shrink_size", 40); }
     public void setKeyboardShrinkSize(int v) { prefs.edit().putInt("keyboard_shrink_size", v).apply(); }
 
