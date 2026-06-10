@@ -129,10 +129,12 @@ public class SettingsManager {
     public boolean isKeyboardMoveAbove() { return prefs.getBoolean("keyboard_move_above", true); }
     public void setKeyboardMoveAbove(boolean v) { prefs.edit().putBoolean("keyboard_move_above", v).apply(); }
 
-    // Klavye üst çizgisi ile butonun altı arasındaki boşluk, nominal mm (0–30).
-    // Nominal: dp tabanlı sabit çevrim — her telefonda aynı görsel boşluk.
-    public int getKbGapMm() { return Math.max(0, Math.min(30, prefs.getInt("kb_gap_mm", 3))); }
-    public void setKbGapMm(int v) { prefs.edit().putInt("kb_gap_mm", Math.max(0, Math.min(30, v))).apply(); }
+    // Klavye üst çizgisi ile butonun altı arasındaki boşluk — MİKROMETRE
+    // cinsinden saklanır (0–30000 µm = 0–30 mm), böylece kaydırıcı 0.5 mm
+    // gibi ince adımlarla ayarlanabilir. Çevrim nominal/dp tabanlıdır:
+    // her telefonda aynı görsel boşluk.
+    public int getKbGapUm() { return Math.max(0, Math.min(30000, prefs.getInt("kb_gap_um", 3000))); }
+    public void setKbGapUm(int um) { prefs.edit().putInt("kb_gap_um", Math.max(0, Math.min(30000, um))).apply(); }
     public int getKeyboardShrinkSize() { return prefs.getInt("keyboard_shrink_size", 40); }
     public void setKeyboardShrinkSize(int v) { prefs.edit().putInt("keyboard_shrink_size", v).apply(); }
 

@@ -174,15 +174,15 @@ public class FloatingService extends Service {
                     params.height = sizePx;
                 }
 
-                // Klavye üstü boşluk: klavyenin üst sınır çizgisi ile butonun
-                // altı arasındaki mesafe — ayarlardan mm olarak seçilir.
-                int gap = nominalMmToPx(settings.getKbGapMm());
+                // Klavye üstü boşluk: ayarlardan mikrometre olarak gelir (ince ayar).
+                int gap = nominalMmToPx(settings.getKbGapUm() / 1000f);
                 if (settings.isKeyboardMoveAbove()) {
-                    // SADECE buton klavyenin altında kalıyorsa ya da üst sınıra
-                    // nohut boşluğundan fazla yaklaşmışsa taşı; klavyeden uzaktaysa
-                    // YERİNDE bırak (kullanıcının bıraktığı konuma dokunma).
+                    // SADECE buton klavyenin üst sınır çizgisine değiyor/örtüşüyorsa
+                    // taşı (yani klavye butonun üstüne biniyorsa). Çizgiye değmiyorsa
+                    // buton nerede olursa olsun YERİNDE kalır. Taşınınca butonun altı,
+                    // klavye çizgisinin "gap" kadar üstüne oturur.
                     int btnBottom = params.y + params.height;
-                    if (btnBottom > kbTop - gap) {
+                    if (btnBottom > kbTop) {
                         params.y = Math.max(dpToPx(8), kbTop - gap - params.height);
                     }
                 }

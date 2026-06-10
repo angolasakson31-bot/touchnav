@@ -740,9 +740,9 @@ public class SettingsActivity extends Activity {
                     :"If the keyboard would cover the button, it moves above the keyboard's top edge by the gap you pick below; if it's already clear, it stays put. Returns to its place when the keyboard closes.",
             settings.isKeyboardMoveAbove(),v->{settings.setKeyboardMoveAbove(v);sendRefresh();buildCards();});
         if (settings.isKeyboardMoveAbove())
-            addSlider(card,L.kbGap(),
-                L.isTr()?"Taşınınca butonun altı ile klavyenin üst çizgisi arasındaki boşluk. 0 = bitişik, 10 = bir parmak boyu.":"Gap between the button's bottom and the keyboard's top edge when moved. 0 = touching, 10 = about a finger width.",
-                0,30,settings.getKbGapMm(),"mm",v->settings.setKbGapMm(v));
+            addSliderF(card,L.kbGap(),
+                L.isTr()?"Buton klavyeye bindiğinde, altı ile klavyenin üst çizgisi arasında kalacak boşluk. 0,5 mm adımlarla ince ayarla — 0 = tam bitişik.":"Gap between the button's bottom and the keyboard's top line when the button is covered. Fine-tune in 0.5 mm steps — 0 = touching.",
+                0f,30f,0.5f,settings.getKbGapUm()/1000f," mm",v->settings.setKbGapUm(v));
         addToggle(card,L.kbShrink(),L.isTr()?"Klavye açıkken otomatik küçültme.":"Auto-shrink when keyboard opens.",
             settings.isKeyboardShrink(),v->{settings.setKeyboardShrink(v);sendRefresh();buildCards();});
         if (!settings.isKeyboardShrink()) return;
