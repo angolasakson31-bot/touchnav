@@ -736,8 +736,8 @@ public class SettingsActivity extends Activity {
             L.isTr()?"Klavye davranışları: buton klavyenin tam üstüne taşınabilir ve/veya küçülebilir. Klavye kapanınca buton eski yerine ve boyutuna döner. Erişilebilirlik gerekir."
                     :"Keyboard behaviors: button can move right above the keyboard and/or shrink. It returns to its place and size when keyboard closes. Requires Accessibility.");
         addToggle(card,L.kbMoveAbove(),
-            L.isTr()?"Klavye açılınca buton, yatay konumunu koruyarak klavyenin hemen üst kenarına oturur; kapanınca eski yerine döner. Kapalıysa buton yalnızca klavyenin altında kalacaksa taşınır."
-                    :"When keyboard opens, the button sits right above its top edge (keeping its horizontal position) and returns when it closes. If off, the button only moves when the keyboard would cover it.",
+            L.isTr()?"Buton klavyenin altında kalacaksa, klavyenin üst sınır çizgisinden bir nohut boyu (~8mm) yukarıya taşınır; klavyeden uzaktaysa yerinde kalır. Klavye kapanınca eski yerine döner."
+                    :"If the keyboard would cover the button, it moves to one chickpea (~8mm) above the keyboard's top edge; if it's already clear, it stays put. Returns to its place when the keyboard closes.",
             settings.isKeyboardMoveAbove(),v->{settings.setKeyboardMoveAbove(v);sendRefresh();});
         addToggle(card,L.kbShrink(),L.isTr()?"Klavye açıkken otomatik küçültme.":"Auto-shrink when keyboard opens.",
             settings.isKeyboardShrink(),v->{settings.setKeyboardShrink(v);sendRefresh();buildCards();});

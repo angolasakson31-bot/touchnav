@@ -174,15 +174,17 @@ public class FloatingService extends Service {
                     params.height = sizePx;
                 }
 
-                int gap = dpToPx(8); // klavye ile buton arası boşluk — yakın ama bitişik değil
+                // "Nohut" boşluğu: klavyenin üst sınır çizgisi ile butonun altı
+                // arasında fiziksel ~8mm — dp değil mm, böylece her ekran
+                // yoğunluğunda aynı gerçek boyutta görünür.
+                int gap = mmToPx(8f);
                 if (settings.isKeyboardMoveAbove()) {
-                    // X aynen korunur (son konum); Y daima klavyenin hemen üstü.
-                    params.y = Math.max(dpToPx(8), kbTop - params.height - gap);
-                } else {
-                    // Eski davranış: sadece klavye butonu kapatıyorsa yukarı taşı.
+                    // SADECE buton klavyenin altında kalıyorsa ya da üst sınıra
+                    // nohut boşluğundan fazla yaklaşmışsa taşı; klavyeden uzaktaysa
+                    // YERİNDE bırak (kullanıcının bıraktığı konuma dokunma).
                     int btnBottom = params.y + params.height;
                     if (btnBottom > kbTop - gap) {
-                        params.y = Math.max(dpToPx(8), kbTop - params.height - dpToPx(16));
+                        params.y = Math.max(dpToPx(8), kbTop - gap - params.height);
                     }
                 }
                 // NOT: Geçici taşımayı KAYITLI konuma yazmıyoruz — klavye kapanınca
@@ -1216,5 +1218,10 @@ public class FloatingService extends Service {
     }
 
     private int dpToPx(int dp) { return (int)(dp * getResources().getDisplayMetrics().density); }
+    /** Fiziksel milimetreyi piksele çevirir — "nohut boyu" gibi gerçek dünya boşlukları için. */
+    private int mmToPx(float mm) {
+        return (int) android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_MM, mm, getResources().getDisplayMetrics());
+    }
     private static int clamp(int v, int mn, int mx) { return Math.max(mn, Math.min(mx, v)); }
 }
