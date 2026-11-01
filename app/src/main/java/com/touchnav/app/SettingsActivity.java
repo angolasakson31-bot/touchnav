@@ -52,6 +52,9 @@ public class SettingsActivity extends Activity {
 
     private List<AppItem> cachedApps = null;
 
+    private static final int REQ_BACKUP_EXPORT = 3001;
+    private static final int REQ_BACKUP_IMPORT = 3002;
+
     static class AppItem {
         String name, pkg; Drawable icon;
         AppItem(String n, String p, Drawable d){ name=n; pkg=p; icon=d; }
@@ -310,6 +313,60 @@ public class SettingsActivity extends Activity {
         buildBatteryCard();
         buildNotifCard();
         buildCompatCard();
+        buildBackupCard();
+    }
+
+    // ── Yedekle / Geri yükle ─────────────────────────────────────
+    private void buildBackupCard() {
+        LinearLayout card=makeCard(L.cardBackup(),L.backupInfo());
+        LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); card.addView(row);
+        addBtn(row,L.backupExport(),this::startBackupExport);
+        addBtn(row,L.backupImport(),this::startBackupImport);
+    }
+
+    private void startBackupExport() {
+        String date=new java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.US).format(new java.util.Date());
+        Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/json");
+        i.putExtra(Intent.EXTRA_TITLE,"touchnav-yedek-"+date+".json");
+        try { startActivityForResult(i,REQ_BACKUP_EXPORT); }
+        catch (Exception e) { toast(L.backupNoPicker()); }
+    }
+
+    private void startBackupImport() {
+        Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        // Bazı dosya yöneticileri .json'u "application/octet-stream" veya
+        // "text/plain" olarak işaretler — hepsine izin ver, içeriği biz doğrularız.
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/plain","application/octet-stream"});
+        try { startActivityForResult(i,REQ_BACKUP_IMPORT); }
+        catch (Exception e) { toast(L.backupNoPicker()); }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req,res,data);
+        if (res!=RESULT_OK || data==null || data.getData()==null) return;
+        android.net.Uri uri=data.getData();
+        BackupManager bm=new BackupManager(this);
+        if (req==REQ_BACKUP_EXPORT) {
+            try { bm.exportTo(uri); toast(L.backupSaved()); }
+            catch (Exception e) { toast(L.backupFailed()); }
+        } else if (req==REQ_BACKUP_IMPORT) {
+            new AlertDialog.Builder(this).setTitle(L.backupImport())
+                .setMessage(L.backupConfirm())
+                .setPositiveButton(L.ok(),(d,w)->{
+                    try {
+                        int n=bm.importFrom(uri);
+                        L.init(this); cachedApps=null;
+                        sendRefresh(); applyTheme(); buildCards();
+                        toast(L.backupRestored()+" ("+n+")");
+                    } catch (Exception e) { toast(L.backupInvalid()); }
+                })
+                .setNegativeButton(L.cancel(),null).show();
+        }
     }
 
     private String[] actions() { return L.actionLabels(); }

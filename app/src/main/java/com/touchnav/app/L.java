@@ -121,6 +121,22 @@ public class L {
     public static String compatInfo()    { return s(
         "Aktifken Play Store, bankacılık ve ödeme uygulamaları açıldığında TouchNav kendini tamamen kaldırır, sorun yaşamazsınız.",
         "When active, TouchNav fully hides itself when Play Store, banking or payment apps open — no more freezing or blocking."); }
+    // ── Yedekleme ────────────────────────────────────────────────
+    public static String cardBackup()    { return s("YEDEKLE / GERİ YÜKLE", "BACKUP / RESTORE"); }
+    public static String backupInfo()    { return s(
+        "Tüm ayarlarını ve profillerini tek bir dosyaya kaydet. Dosyayı Drive'a, İndirilenler'e veya yeni telefonuna taşıyıp oradan geri yükleyebilirsin.",
+        "Save all your settings and profiles to a single file. Move it to Drive, Downloads or a new phone and restore from there."); }
+    public static String backupExport()  { return s("⤓ Yedekle", "⤓ Backup"); }
+    public static String backupImport()  { return s("⤒ Geri Yükle", "⤒ Restore"); }
+    public static String backupSaved()   { return s("Yedek kaydedildi ✓", "Backup saved ✓"); }
+    public static String backupFailed()  { return s("Yedek kaydedilemedi", "Backup could not be saved"); }
+    public static String backupRestored(){ return s("Ayarlar geri yüklendi ✓", "Settings restored ✓"); }
+    public static String backupInvalid() { return s("Geçerli bir TouchNav yedeği değil", "Not a valid TouchNav backup"); }
+    public static String backupConfirm() { return s(
+        "Mevcut ayarların yedekteki ayarlarla değiştirilecek. Devam edilsin mi?",
+        "Your current settings will be replaced with the backup. Continue?"); }
+    public static String backupNoPicker(){ return s("Dosya seçici bulunamadı", "No file picker available"); }
+
     public static String language()     { return s("Dil / Language", "Language / Dil"); }
 
     // ── Hareket etiketleri ───────────────────────────────────────
