@@ -254,7 +254,9 @@ public class SettingsActivity extends Activity {
             ApplicationInfo ai=ri.activityInfo.applicationInfo;
             boolean isSystem=(ai.flags&ApplicationInfo.FLAG_SYSTEM)!=0;
             boolean isUpdated=(ai.flags&ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)!=0;
-            AppItem item=new AppItem(ri.loadLabel(pm).toString(),pkg,ri.loadIcon(pm));
+            // İkon yüklemesi kaldırıldı: liste ikon göstermiyor, yüzlerce ikonu
+            // ana thread'de yüklemek düşük cihazlarda donma/ANR yapıyordu.
+            AppItem item=new AppItem(ri.loadLabel(pm).toString(),pkg,null);
             if (!isSystem||isUpdated) user.add(item); else sys.add(item);
         }
         Collections.sort(user,(a,b)->a.name.compareToIgnoreCase(b.name));
@@ -264,7 +266,10 @@ public class SettingsActivity extends Activity {
     }
 
     private void showMultiAppPicker(TextView pickerBtn) {
-        List<AppItem> apps=getLauncherApps(); int count=apps.size();
+        List<AppItem> apps=new ArrayList<>();
+        Set<String> seenPk=new HashSet<>();
+        for (AppItem a:getLauncherApps()) if (seenPk.add(a.pkg)) apps.add(a);
+        int count=apps.size();
         String[] names=new String[count]; boolean[] checked=new boolean[count];
         Set<String> savedSet=new HashSet<>();
         String saved=settings.getHidePackages();
@@ -671,31 +676,13 @@ public class SettingsActivity extends Activity {
      * Kullanıcı uygulamaları önce (ada göre), sistem uygulamaları arkada.
      */
     private List<AppItem> getAllAssistantApps() {
-        PackageManager pm=getPackageManager();
-        List<android.content.pm.ApplicationInfo> installed;
-        try {
-            installed=pm.getInstalledApplications(PackageManager.GET_META_DATA);
-        } catch (Exception e) { installed=new ArrayList<>(); }
-
-        List<AppItem> user=new ArrayList<>(), sys=new ArrayList<>();
-        for (android.content.pm.ApplicationInfo ai:installed) {
-            if (ai.packageName.equals(getPackageName())) continue;
-            // Açılabilir mi? (launch intent yoksa gösterme)
-            Intent launch=pm.getLaunchIntentForPackage(ai.packageName);
-            if (launch==null) continue;
-            String name;
-            try { name=pm.getApplicationLabel(ai).toString(); } catch (Exception e) { continue; }
-            android.graphics.drawable.Drawable icon;
-            try { icon=pm.getApplicationIcon(ai.packageName); } catch (Exception e) { continue; }
-            boolean isSys=(ai.flags&ApplicationInfo.FLAG_SYSTEM)!=0
-                        &&(ai.flags&ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)==0;
-            AppItem item=new AppItem(name,ai.packageName,icon);
-            if (isSys) sys.add(item); else user.add(item);
-        }
-        Collections.sort(user,(a,b)->a.name.compareToIgnoreCase(b.name));
-        Collections.sort(sys,(a,b)->a.name.compareToIgnoreCase(b.name));
-        List<AppItem> result=new ArrayList<>(user);
-        result.addAll(sys);
+        // Başlatıcıda görünen (açılabilir) uygulamalar — tek sorguda, ikonsuz.
+        // Eskiden her paket için ayrı getLaunchIntentForPackage + ikon
+        // yükleniyordu; çok uygulamalı cihazlarda saniyelerce donma yapıyordu.
+        // Aynı paketin birden fazla launcher aktivitesi olabilir: tekilleştir.
+        List<AppItem> result=new ArrayList<>();
+        Set<String> seen=new HashSet<>();
+        for (AppItem a:getLauncherApps()) if (seen.add(a.pkg)) result.add(a);
         return result;
     }
 
@@ -853,7 +840,7 @@ public class SettingsActivity extends Activity {
     private void showNewProfileDialog() {
         EditText input=new EditText(this); input.setHint(L.profileName()); input.setPadding(px(16),px(12),px(16),px(12));
         new AlertDialog.Builder(this).setTitle(L.newProfile()).setView(input)
-            .setPositiveButton(L.save(),(d,w)->{String name=input.getText().toString().trim();
+            .setPositiveButton(L.save(),(d,w)->{String name=ProfileManager.sanitizeName(input.getText().toString());
                 if(!name.isEmpty()){profiles.saveProfile(name);settings.setCurrentProfile(name);sendRefresh();buildCards();}
             }).setNegativeButton(L.cancel(),null).show();
     }

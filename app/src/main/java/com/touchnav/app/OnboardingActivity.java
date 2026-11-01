@@ -99,8 +99,13 @@ public class OnboardingActivity extends Activity {
         pageContainer.setOrientation(LinearLayout.VERTICAL);
         pageContainer.setGravity(Gravity.CENTER_HORIZONTAL);
         pageContainer.setPadding(px(28), 0, px(28), 0);
+        // Küçük ekranlarda / büyük yazı tipinde içerik taşmasın: kaydırılabilir
+        android.widget.ScrollView pageScroll = new android.widget.ScrollView(this);
+        pageScroll.setFillViewport(true);
+        pageScroll.setVerticalScrollBarEnabled(false);
+        pageScroll.addView(pageContainer, new android.widget.FrameLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams pcLp = new LinearLayout.LayoutParams(-1, 0, 1f);
-        root.addView(pageContainer, pcLp);
+        root.addView(pageScroll, pcLp);
 
         // Butonlar
         LinearLayout btnRow = new LinearLayout(this);
@@ -214,7 +219,9 @@ public class OnboardingActivity extends Activity {
                 L.isTr() ? "Erişilebilirlik Ayarlarını Aç →" : "Open Accessibility Settings →",
                 () -> {
                     try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
-                    catch (Exception e) { startActivity(new Intent(Settings.ACTION_SETTINGS)); }
+                    catch (Exception e) {
+                        try { startActivity(new Intent(Settings.ACTION_SETTINGS)); } catch (Exception ignored) {}
+                    }
                 });
         }
     }
@@ -440,7 +447,7 @@ public class OnboardingActivity extends Activity {
                 float cx = getWidth()/2f, cy = getHeight()/2f;
                 float r = cx - 8f, inner = r * 0.55f;
                 float mid = (r + inner) / 2f, thick = r - inner;
-                int color = new SettingsManager(getContext()).getButtonColor();
+                int color = settings.getButtonColor();
                 glow.setColor(color); glow.setAlpha(70);
                 glow.setMaskFilter(new android.graphics.BlurMaskFilter(thick, android.graphics.BlurMaskFilter.Blur.NORMAL));
                 glow.setStrokeWidth(thick);
@@ -473,8 +480,10 @@ public class OnboardingActivity extends Activity {
     }
 
     private void openAppInfo() {
-        startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.parse("package:" + getPackageName())));
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {}
     }
 
     private void openMiuiAutostart() {

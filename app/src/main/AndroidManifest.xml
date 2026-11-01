@@ -8,12 +8,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
-    <uses-permission android:name="android.permission.BATTERY_STATS"/>
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <!-- Bildirim rozeti için (kullanıcı manuel vermelidir) -->
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"/>
-    <!-- Widget için -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Android 13+: servis bildirimini (ve "Durdur" düğmesini) göstermek için -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Not: El feneri (setTorchMode) CAMERA izni gerektirmez; BATTERY_STATS ve
+         BIND_NOTIFICATION_LISTENER_SERVICE uygulamalara verilemeyen sistem
+         izinleriydi — gereksiz izin uyarısı yaratmamak için kaldırıldı. -->
     <!-- Android 11+ tüm yüklü uygulamaları görmek için -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
 
@@ -26,6 +25,7 @@
         <!-- ── MainActivity ──────────────────────────────────── -->
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -47,7 +47,11 @@
         <service
             android:name=".FloatingService"
             android:exported="false"
-            android:foregroundServiceType="specialUse"/>
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating on-screen navigation button overlay"/>
+        </service>
 
         <!-- ── NavService (Erişilebilirlik) ─────────────────── -->
         <service
@@ -78,6 +82,8 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <!-- Güncelleme (APK üstüne kurulum) sonrası servis geri gelsin -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
         </receiver>
 

@@ -13,6 +13,16 @@ public class ProfileManager {
     private static final String SKIP_KEY_1     = "profile_list";
     private static final String SKIP_KEY_2     = "current_profile";
     private static final String SKIP_KEY_3     = "pos_preset";
+    // Uygulama durumu — profille taşınmamalı (ör. eski profili yüklemek
+    // çalışan servisi "kapalı" işaretleyip açılışta başlamamasına yol açıyordu)
+    private static final java.util.Set<String> STATE_KEYS = new java.util.HashSet<>(
+        java.util.Arrays.asList("service_enabled", "onboarding_done"));
+
+    /** Profil adını güvenli hale getirir: virgül liste ayırıcıdır, kullanılamaz. */
+    public static String sanitizeName(String name) {
+        if (name == null) return "";
+        return name.replace(",", " ").trim();
+    }
 
     private final Context context;
     private final SettingsManager settings;
@@ -36,12 +46,15 @@ public class ProfileManager {
 
     /** Mevcut ayarları 'name' profiline kaydeder ve profil listesine ekler */
     public void saveProfile(String name) {
+        name = sanitizeName(name);
+        if (name.isEmpty()) return;
         SharedPreferences src = settings.getRawPrefs();
         SharedPreferences dst = context.getSharedPreferences(PROFILE_PREFIX + name, Context.MODE_PRIVATE);
         SharedPreferences.Editor e = dst.edit();
         for (Map.Entry<String, ?> entry : src.getAll().entrySet()) {
             String k = entry.getKey();
             if (k.equals(SKIP_KEY_1) || k.equals(SKIP_KEY_2) || k.equals(SKIP_KEY_3)) continue;
+            if (STATE_KEYS.contains(k)) continue;
             Object v = entry.getValue();
             if      (v instanceof Integer) e.putInt(k, (Integer) v);
             else if (v instanceof Float)   e.putFloat(k, (Float) v);
@@ -65,6 +78,7 @@ public class ProfileManager {
         SharedPreferences.Editor e = dst.edit();
         for (Map.Entry<String, ?> entry : src.getAll().entrySet()) {
             String k = entry.getKey();
+            if (k.equals(SKIP_KEY_1) || k.equals(SKIP_KEY_2) || STATE_KEYS.contains(k)) continue;
             Object v = entry.getValue();
             if      (v instanceof Integer) e.putInt(k, (Integer) v);
             else if (v instanceof Float)   e.putFloat(k, (Float) v);

@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/root_main"
+<!-- ScrollView: küçük ekranlarda / büyük yazı tipinde izin kartları taşmasın -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+<LinearLayout
+    android:id="@+id/root_main"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical">
 
     <!-- ── Üst bar ──────────────────────────────────────────────── -->
@@ -125,3 +132,5 @@
         android:paddingRight="24dp"/>
 
 </LinearLayout>
+
+</ScrollView>

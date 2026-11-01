@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
 
     private static final int REQ_OVERLAY = 1001;
     private static final int REQ_BATTERY = 1002;
+    private static final int REQ_NOTIF   = 1003;
 
     private SettingsManager settings;
     private boolean serviceRunning = false;
@@ -62,6 +63,17 @@ public class MainActivity extends Activity {
         serviceRunning = FloatingService.isRunning();
         updateStatus();
         setupClicks();
+        requestNotificationPermissionIfNeeded();
+    }
+
+    /** Android 13+: servis bildirimi ("Durdur" düğmesi) için izin iste. */
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try { requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, REQ_NOTIF); }
+            catch (Exception ignored) {}
+        }
     }
 
     @Override
@@ -191,7 +203,8 @@ public class MainActivity extends Activity {
             btnToggle.setText(L.startBtn());
             setToggleBg(0xFF64B5F6);
             int theme = settings.getTheme();
-            tvNote.setText("Erişilebilirlik: Ayarlar → Erişilebilirlik → TouchNav");
+            tvNote.setText(L.s("Erişilebilirlik: Ayarlar → Erişilebilirlik → TouchNav",
+                               "Accessibility: Settings → Accessibility → TouchNav"));
             tvNote.setTextColor(theme==1 ? 0xFF999999 : 0xFF444455);
         }
 
@@ -302,8 +315,11 @@ public class MainActivity extends Activity {
                         REQ_OVERLAY);
                 } else {
                     startFloatingService();
-                    serviceRunning = true;
-                    btnToggle.post(this::updateStatus);
+                    // Gerçek durumu servis başladıktan sonra oku
+                    btnToggle.postDelayed(() -> {
+                        serviceRunning = FloatingService.isRunning();
+                        updateStatus();
+                    }, 300);
                 }
             }
         });
@@ -320,11 +336,20 @@ public class MainActivity extends Activity {
 
     private void startFloatingService() {
         settings.setServiceEnabled(true);
+        serviceRunning = true;
         Intent i = new Intent(this, FloatingService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            startForegroundService(i);
-        else
-            startService(i);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                startForegroundService(i);
+            else
+                startService(i);
+        } catch (Exception e) {
+            settings.setServiceEnabled(false);
+            serviceRunning = false;
+            android.widget.Toast.makeText(this,
+                L.s("Servis başlatılamadı", "Service could not be started"),
+                android.widget.Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -332,8 +357,10 @@ public class MainActivity extends Activity {
         super.onActivityResult(req, res, data);
         if (req == REQ_OVERLAY && Settings.canDrawOverlays(this)) {
             startFloatingService();
-            serviceRunning = true;
-            btnToggle.postDelayed(this::updateStatus, 300);
+            btnToggle.postDelayed(() -> {
+                serviceRunning = FloatingService.isRunning();
+                updateStatus();
+            }, 300);
         }
     }
 
@@ -391,12 +418,16 @@ public class MainActivity extends Activity {
 
     private void openAccessibilitySettings() {
         try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
-        catch (Exception e) { startActivity(new Intent(Settings.ACTION_SETTINGS)); }
+        catch (Exception e) {
+            try { startActivity(new Intent(Settings.ACTION_SETTINGS)); } catch (Exception ignored) {}
+        }
     }
 
     private void openAppInfo() {
-        startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.parse("package:" + getPackageName())));
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {}
     }
 
     private void openNotifAccess() {

@@ -33,6 +33,8 @@ import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 
+import androidx.core.content.ContextCompat;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -130,21 +132,30 @@ public class FloatingService extends Service {
         @Override public void onReceive(Context ctx, Intent i) {
             String pkg = i.getStringExtra("package");
             if (pkg == null) return;
-            hiddenByPkg = false;
-            // Uyumluluk modu: yerleşik güvenli uygulama listesi
-            if (settings.isCompatMode() && SECURE_PKGS.contains(pkg)) {
-                hiddenByPkg = true;
-            }
-            // Kullanıcının özel gizleme listesi
-            if (!hiddenByPkg) {
-                String list = settings.getHidePackages();
-                if (!list.isEmpty())
-                    for (String p : list.split(","))
-                        if (pkg.trim().equals(p.trim())) { hiddenByPkg = true; break; }
-            }
+            currentPkg = pkg;
+            evaluateHiddenByPkg();
             updateVisibility();
         }
     };
+
+    private String currentPkg = null;
+
+    /** Ön plandaki paket gizleme listesinde mi? (ayar değişince de yeniden değerlendirilir) */
+    private void evaluateHiddenByPkg() {
+        hiddenByPkg = false;
+        String pkg = currentPkg;
+        if (pkg == null || settings == null) return;
+        // Uyumluluk modu: yerleşik güvenli uygulama listesi
+        if (settings.isCompatMode() && SECURE_PKGS.contains(pkg)) {
+            hiddenByPkg = true;
+            return;
+        }
+        // Kullanıcının özel gizleme listesi
+        String list = settings.getHidePackages();
+        if (!list.isEmpty())
+            for (String p : list.split(","))
+                if (pkg.trim().equals(p.trim())) { hiddenByPkg = true; return; }
+    }
 
     // Klavye receiver — tek instance, IntentFilter'a iki action ekliyoruz
     private final BroadcastReceiver keyboardReceiver = new BroadcastReceiver() {
@@ -168,11 +179,16 @@ public class FloatingService extends Service {
                 }
 
                 // Önce boyut (küçültme açıksa) — konum hesabı yeni boyuta göre yapılır
-                if (settings.isKeyboardShrink()) {
-                    int sizePx = dpToPx(settings.getKeyboardShrinkSize());
-                    params.width  = sizePx;
-                    params.height = sizePx;
-                }
+                int sizePx = settings.isKeyboardShrink()
+                        ? dpToPx(settings.getKeyboardShrinkSize())
+                        : dpToPx(settings.getSize());
+                params.width  = sizePx;
+                params.height = sizePx;
+                // Hesap DAİMA kalıcı kayıtlı konumdan başlar: klavye boyu değişip
+                // (emoji paneli vb.) yeniden SHOW gelse bile buton gereksiz yere
+                // yukarıda takılı kalmaz, doğru yere oturur.
+                params.x = settings.getX();
+                params.y = settings.getY();
 
                 // Klavye üstü boşluk: ayarlardan mikrometre olarak gelir (ince ayar).
                 int gap = nominalMmToPx(settings.getKbGapUm() / 1000f);
@@ -209,11 +225,13 @@ public class FloatingService extends Service {
                 homeY = params.y;
             }
 
-            try {
-                windowManager.updateViewLayout(floatView, params);
-                floatView.requestLayout();
-                floatView.invalidate();
-            } catch (Exception ignored) {}
+            if (viewAttached) {
+                try {
+                    windowManager.updateViewLayout(floatView, params);
+                    floatView.requestLayout();
+                    floatView.invalidate();
+                } catch (Exception ignored) {}
+            }
         }
     };
 
@@ -260,33 +278,49 @@ public class FloatingService extends Service {
         createNotificationChannel();
         startForeground(NOTIF_ID, buildNotification());
 
-        boolean s31 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
-        reg(stopReceiver,    new IntentFilter(ACTION_STOP),                   s31);
-        reg(refreshReceiver, new IntentFilter(ACTION_REFRESH),                s31);
-        reg(snapReceiver,    new IntentFilter(ACTION_SNAP),                   s31);
-        reg(windowReceiver,  new IntentFilter("com.touchnav.WINDOW_CHANGED"), s31);
-        reg(notifReceiver,   new IntentFilter(ACTION_NOTIF_UPDATE),           s31);
+        // Overlay izni yoksa (kullanıcı geri aldıysa) düğmesiz "zombi" ön plan
+        // servisi olarak kalmayalım: hemen kapan.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !android.provider.Settings.canDrawOverlays(this)) {
+            settings.setServiceEnabled(false);
+            stopSelf();
+            return;
+        }
+
+        reg(stopReceiver,    new IntentFilter(ACTION_STOP));
+        reg(refreshReceiver, new IntentFilter(ACTION_REFRESH));
+        reg(snapReceiver,    new IntentFilter(ACTION_SNAP));
+        reg(windowReceiver,  new IntentFilter("com.touchnav.WINDOW_CHANGED"));
+        reg(notifReceiver,   new IntentFilter(ACTION_NOTIF_UPDATE));
 
         // Klavye receiver: TEK instance, çift action — doğru yöntem
         IntentFilter kbFilter = new IntentFilter();
         kbFilter.addAction(ACTION_KEYBOARD_SHOW);
         kbFilter.addAction(ACTION_KEYBOARD_HIDE);
-        if (s31) registerReceiver(keyboardReceiver, kbFilter, Context.RECEIVER_NOT_EXPORTED);
-        else     registerReceiver(keyboardReceiver, kbFilter);
+        reg(keyboardReceiver, kbFilter);
 
-        // Pil değişimi: sistem broadcast'ı, RECEIVER_NOT_EXPORTED kullanılmaz
-        registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        // Pil değişimi: sistem broadcast'ı (korumalı yayın, dışarıdan gönderilemez)
+        ContextCompat.registerReceiver(this, batteryReceiver,
+                new IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_EXPORTED);
 
+        registerTorchCallback();
         createFloatingButton();
+        if (floatView == null) {
+            // Pencere eklenemedi (izin yok / sistem reddetti) — boşuna çalışma
+            settings.setServiceEnabled(false);
+            stopSelf();
+            return;
+        }
+        TouchNavWidget.refreshAll(this);
         // Sticky pil broadcast'ı createFloatingButton öncesinde gelmiş olabilir;
         // floatView null iken uygulanamayan rengi şimdi yenile.
         updateDrawColor();
         if (floatView != null) floatView.invalidate();
     }
 
-    private void reg(BroadcastReceiver r, IntentFilter f, boolean s31) {
-        if (s31) registerReceiver(r, f, Context.RECEIVER_NOT_EXPORTED);
-        else     registerReceiver(r, f);
+    /** Uygulama içi yayınlar için: tüm sürümlerde güvenli, dışarıya kapalı kayıt. */
+    private void reg(BroadcastReceiver r, IntentFilter f) {
+        ContextCompat.registerReceiver(this, r, f, ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override public void onConfigurationChanged(Configuration cfg) {
@@ -301,11 +335,17 @@ public class FloatingService extends Service {
             windowManager.getDefaultDisplay().getMetrics(dm);
             screenW = dm.widthPixels;
             screenH = dm.heightPixels;
-            if (floatView != null && params != null && viewAttached) {
-                params.x = clamp(params.x, 0, screenW - params.width);
-                params.y = clamp(params.y, 0, screenH - params.height);
+            if (floatView != null && params != null) {
+                // Kayıtlı konumdan yeniden hesapla: yatay modda daraltılmış
+                // değerler dikeye dönünce butonu yanlış yere taşımasın.
+                int bx = keyboardVisible ? params.x : settings.getX();
+                int by = keyboardVisible ? params.y : settings.getY();
+                params.x = clamp(bx, 0, screenW - params.width);
+                params.y = clamp(by, 0, screenH - params.height);
                 homeX = params.x; homeY = params.y;
-                try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+                if (viewAttached) {
+                    try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+                }
             }
         }
         updateVisibility();
@@ -316,6 +356,9 @@ public class FloatingService extends Service {
 
     @Override public void onDestroy() {
         sRunning = false;
+        unregisterTorchCallback();
+        if (transparencyRunnable != null) transparencyHandler.removeCallbacks(transparencyRunnable);
+        transparencyHandler.removeCallbacksAndMessages(null);
         detachView();
         stopPulse();
         if (flashAnimator != null) { flashAnimator.cancel(); flashAnimator = null; }
@@ -327,21 +370,25 @@ public class FloatingService extends Service {
         try { unregisterReceiver(batteryReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(notifReceiver);   } catch (Exception ignored) {}
         cancelGhostTimer();
-        cancelTransparencyTimer();
         longPressHandler.removeCallbacksAndMessages(null);
         ghostHandler.removeCallbacksAndMessages(null);
         tempHideHandler.removeCallbacksAndMessages(null);
         if (torchOn) { torchOn = false; try {
             android.hardware.camera2.CameraManager cm =
                 (android.hardware.camera2.CameraManager) getSystemService(CAMERA_SERVICE);
-            if (cm != null) { String[] ids = cm.getCameraIdList(); if (ids.length > 0) cm.setTorchMode(ids[0], false); }
+            String id = findTorchCameraId(cm);
+            if (cm != null && id != null) cm.setTorchMode(id, false);
         } catch (Exception ignored) {} }
+        TouchNavWidget.refreshAll(this);
         super.onDestroy();
     }
 
     // ── Ayarları uygula (sendRefresh broadcast) ───────────────────
     private void applySettings() {
         if (floatView == null) return;
+        // Uyumluluk modu / gizleme listesi değiştiyse anında uygula
+        evaluateHiddenByPkg();
+        updateVisibility();
         currentStyle = settings.getButtonStyle();
         currentColor = settings.getButtonColor();
         updateDrawColor();
@@ -349,18 +396,19 @@ public class FloatingService extends Service {
         if (!transparencyActive) floatView.setAlpha(settings.getOpacity());
 
         int newPx = dpToPx(settings.getSize());
-        if (!keyboardVisible && params.width != newPx) {
+        if (!keyboardVisible) {
+            // Boyut ve KAYITLI konum (profil yüklenince konum da değişebilir)
             params.width  = newPx;
             params.height = newPx;
-            params.x = clamp(params.x, 0, screenW - newPx);
-            params.y = clamp(params.y, 0, screenH - newPx);
+            params.x = clamp(settings.getX(), 0, screenW - newPx);
+            params.y = clamp(settings.getY(), 0, screenH - newPx);
             homeX = params.x; homeY = params.y;
-            try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+            if (viewAttached) {
+                try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+            }
         }
 
-        cancelGhostTimer();
-        if (settings.isGhostMode()) startGhostTimer();
-        else if (!transparencyActive) floatView.setAlpha(settings.getOpacity());
+        startGhostTimer();
 
         if (settings.isPulseEnabled()) startPulse(); else stopPulse();
 
@@ -673,9 +721,13 @@ public class FloatingService extends Service {
         homeX = params.x; homeY = params.y;
 
         floatView.setOnTouchListener((v, e) -> handleTouch(e));
-        attachView();
-        if (!viewAttached) { floatView = null; return; }
-        updateVisibility();
+        // Servis yeniden başladıysa (ör. START_STICKY) şu an açık uygulama
+        // gizleme listesindeyse hiç görünmeden başla.
+        NavService nav = NavService.getInstance();
+        if (nav != null) { currentPkg = nav.getLastForegroundPkg(); evaluateHiddenByPkg(); }
+        updateVisibility(); // görünmesi gerekiyorsa pencereyi ekler
+        boolean shouldShow = !hiddenByPkg && !tempHidden && !isLandscape;
+        if (shouldShow && !viewAttached) { floatView = null; return; } // eklenemedi
         startGhostTimer();
         if (settings.isPulseEnabled()) startPulse();
     }
@@ -725,7 +777,7 @@ public class FloatingService extends Service {
                 touchPath.clear();
                 touchPath.add(new float[]{e.getRawX(), e.getRawY()});
                 cancelGhostTimer();
-                cancelTransparencyTimer();
+                floatView.animate().cancel(); // süren soluklaşma animasyonu alpha'yı ezmesin
                 floatView.setAlpha(1.0f);
                 doHaptic(false);
 
@@ -754,6 +806,16 @@ public class FloatingService extends Service {
                 }
                 return true;
             }
+            case MotionEvent.ACTION_CANCEL: {
+                // Sistem dokunuşu iptal etti (ör. bildirim paneli indi) —
+                // long-press'i iptal et, büyütmeyi geri al, aksiyon tetikleme.
+                if (longPressRunnable != null) longPressHandler.removeCallbacks(longPressRunnable);
+                if (longPressActive) floatView.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                longPressActive = false;
+                touchPath.clear();
+                startGhostTimer();
+                return true;
+            }
             case MotionEvent.ACTION_UP: {
                 if (longPressRunnable != null) longPressHandler.removeCallbacks(longPressRunnable);
 
@@ -763,8 +825,12 @@ public class FloatingService extends Service {
                 if (longPressActive) {
                     floatView.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
                     if (!settings.isLocked()) {
-                        homeX = params.x; homeY = params.y;
-                        settings.savePosition(params.x, params.y);
+                        // Sadece gerçekten sürüklendiyse kaydet — klavye için
+                        // geçici kaldırılmış konum kalıcı konuma yazılmasın.
+                        if (moved) {
+                            homeX = params.x; homeY = params.y;
+                            settings.savePosition(params.x, params.y);
+                        }
                     } else {
                         final int fx = params.x, fy = params.y;
                         ghostHandler.postDelayed(() -> animateReturnHome(fx, fy), settings.getTempMoveDelay());
@@ -781,7 +847,11 @@ public class FloatingService extends Service {
                     if (g == 2) { doActionWithHaptic(settings.getDrawGestureZ()); startGhostTimer(); return true; }
                 }
 
-                if (!settings.isLocked()) {
+                // Sadece sürüklendiyse kaydet. Eskiden klavye açıkken butona
+                // basit bir dokunuş bile klavye üstüne kaldırılmış GEÇİCİ konumu
+                // kalıcı konum olarak kaydediyor, klavye kapanınca buton eski
+                // yerine dönmüyordu.
+                if (!settings.isLocked() && moved) {
                     settings.savePosition(params.x, params.y);
                     homeX = params.x; homeY = params.y;
                 }
@@ -865,7 +935,9 @@ public class FloatingService extends Service {
     }
 
     private void toggleTransparency() {
+        if (floatView == null) return;
         if (transparencyActive) { cancelTransparencyTimer(); return; }
+        cancelGhostTimer();
         transparencyActive = true;
         // Görünmez + dokunulamaz yap (tam gizlilik — o konuma basınca buton olmaz)
         floatView.animate().alpha(0f).setDuration(150).start();
@@ -877,11 +949,19 @@ public class FloatingService extends Service {
 
     private void cancelTransparencyTimer() {
         if (transparencyRunnable != null) { transparencyHandler.removeCallbacks(transparencyRunnable); transparencyRunnable = null; }
+        // Gizlilik aktif değilse yapılacak bir şey yok. (Eskiden her dokunuşta
+        // çalışıp opaklık animasyonu başlatıyor, dokunma geri bildirimini
+        // — tam görünürlüğü — anında geri alıyordu.)
+        if (!transparencyActive) return;
         transparencyActive = false;
+        if (floatView == null || params == null) return;
         // Dokunulabilirliği geri ver, yavaşça görün
         params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-        try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
-        if (floatView != null) floatView.animate().alpha(settings.getOpacity()).setDuration(400).start();
+        if (viewAttached) {
+            try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+        }
+        floatView.animate().alpha(settings.getOpacity()).setDuration(400).start();
+        startGhostTimer();
     }
 
     private void launchAssistant() {
@@ -953,6 +1033,7 @@ public class FloatingService extends Service {
      * full-screen acip true donuyordu (yaniltici).
      */
     private boolean tryPopup(Intent base) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false; // setLaunchBounds API 24+
         try {
             DisplayMetrics dm = getResources().getDisplayMetrics();
             int sw = dm.widthPixels, sh = dm.heightPixels;
@@ -971,7 +1052,7 @@ public class FloatingService extends Service {
 
             startActivity(i, opts.toBundle());
             return true;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             return false; // cihaz freeform desteklemiyor → caller normal acar
         }
     }
@@ -1014,15 +1095,56 @@ public class FloatingService extends Service {
     }
 
     private boolean torchOn = false;
+    private android.hardware.camera2.CameraManager.TorchCallback torchCallback;
+
+    /** Flaşı OLAN ilk kamerayı bulur (ids[0] bazı cihazlarda flaşsız ön kameradır). */
+    private static String findTorchCameraId(android.hardware.camera2.CameraManager cm) {
+        if (cm == null) return null;
+        try {
+            for (String id : cm.getCameraIdList()) {
+                Boolean flash = cm.getCameraCharacteristics(id)
+                    .get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE);
+                if (Boolean.TRUE.equals(flash)) return id;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    /** Fener başka yerden (bildirim paneli vb.) açılıp kapanınca durumumuz şaşmasın. */
+    private void registerTorchCallback() {
+        try {
+            android.hardware.camera2.CameraManager cm =
+                (android.hardware.camera2.CameraManager) getSystemService(CAMERA_SERVICE);
+            final String tid = findTorchCameraId(cm);
+            if (cm == null || tid == null) return;
+            torchCallback = new android.hardware.camera2.CameraManager.TorchCallback() {
+                @Override public void onTorchModeChanged(String cameraId, boolean enabled) {
+                    if (tid.equals(cameraId)) torchOn = enabled;
+                }
+            };
+            cm.registerTorchCallback(torchCallback, new Handler());
+        } catch (Exception ignored) {}
+    }
+
+    private void unregisterTorchCallback() {
+        if (torchCallback == null) return;
+        try {
+            android.hardware.camera2.CameraManager cm =
+                (android.hardware.camera2.CameraManager) getSystemService(CAMERA_SERVICE);
+            if (cm != null) cm.unregisterTorchCallback(torchCallback);
+        } catch (Exception ignored) {}
+        torchCallback = null;
+    }
+
     private void toggleTorch() {
         try {
             android.hardware.camera2.CameraManager cm =
                 (android.hardware.camera2.CameraManager) getSystemService(CAMERA_SERVICE);
-            if (cm == null) return;
-            String[] ids = cm.getCameraIdList();
-            if (ids.length == 0) return;
-            torchOn = !torchOn;
-            cm.setTorchMode(ids[0], torchOn);
+            String id = findTorchCameraId(cm);
+            if (cm == null || id == null) return;
+            boolean target = !torchOn;
+            cm.setTorchMode(id, target);
+            torchOn = target;
         } catch (Exception ignored) {}
     }
 
@@ -1099,10 +1221,18 @@ public class FloatingService extends Service {
     // ── Ghost ────────────────────────────────────────────────────
     private void startGhostTimer() {
         cancelGhostTimer();
-        if (!settings.isGhostMode()) return;
+        if (floatView == null || transparencyActive) return;
+        if (!settings.isGhostMode()) {
+            // Ghost kapalıyken dokunuştan sonra (alpha=1) ayarlanan opaklığa dön.
+            // Eskiden buton ilk dokunuştan sonra kalıcı olarak tam opak kalıyordu.
+            floatView.animate().alpha(settings.getOpacity()).setDuration(300).start();
+            return;
+        }
+        // Soluk hal hiçbir zaman kullanıcının seçtiği opaklıktan DAHA görünür olmasın
+        final float ghostAlpha = Math.min(0.22f, settings.getOpacity());
         ghostRunnable = () -> {
             if (floatView != null && !transparencyActive)
-                floatView.animate().alpha(0.22f).setDuration(600).start();
+                floatView.animate().alpha(ghostAlpha).setDuration(600).start();
         };
         ghostHandler.postDelayed(ghostRunnable, settings.getIdleAlphaTime());
     }
@@ -1113,6 +1243,7 @@ public class FloatingService extends Service {
 
     // ── Preset / Animasyon ───────────────────────────────────────
     private void applyPositionPreset() {
+        if (floatView == null || params == null) return;
         int sz = params.width, m = dpToPx(12);
         switch (settings.getPositionPreset()) {
             case SettingsManager.PRESET_LEFT:   params.x=m;              params.y=screenH/2-sz/2; break;
@@ -1123,7 +1254,9 @@ public class FloatingService extends Service {
         }
         homeX=params.x; homeY=params.y;
         settings.savePosition(params.x, params.y);
-        try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+        if (viewAttached) {
+            try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
+        }
     }
 
     private void animateReturnHome(int fromX, int fromY) {
@@ -1160,11 +1293,17 @@ public class FloatingService extends Service {
         // Pencereyi tamamen kaldırmamız gereken durumlar:
         //  • hiddenByPkg : Uyumlu mod, Play Store/banka gibi güvenli uygulama açık
         //  • tempHidden  : Kullanıcı "Geçici Kapat" hareketini tetikledi
-        if (hiddenByPkg || tempHidden) {
+        //  • isLandscape : yatay modda gizli (video/oyun). Eskiden sadece
+        //                  View.GONE yapılıyordu; görünmez pencere yine de
+        //                  dokunuşları yakalayıp aksiyon tetikliyor ve altındaki
+        //                  uygulamaya dokunmayı engelliyordu. Artık tamamen kaldırılır.
+        if (hiddenByPkg || tempHidden || isLandscape) {
+            if (longPressRunnable != null) longPressHandler.removeCallbacks(longPressRunnable);
+            longPressActive = false;
             detachView();
         } else {
             attachView();
-            if (viewAttached) floatView.setVisibility(isLandscape ? View.GONE : View.VISIBLE);
+            if (viewAttached) floatView.setVisibility(View.VISIBLE);
         }
     }
 
@@ -1197,13 +1336,25 @@ public class FloatingService extends Service {
 
     // ── Bildirim ─────────────────────────────────────────────────
     private Notification buildNotification() {
-        PendingIntent pi = PendingIntent.getBroadcast(this, 0,
-            new Intent(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE);
-        return new Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("TouchNav")
-            .setContentText(getString(R.string.notification_text))
+        // setPackage: Android 14'te örtük (implicit) PendingIntent yayını kısıtlı;
+        // ayrıca NOT_EXPORTED alıcımıza sadece kendi paketimizden ulaşılmalı.
+        Intent stop = new Intent(ACTION_STOP).setPackage(getPackageName());
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, stop,
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Intent open = new Intent(this, MainActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent openPi = PendingIntent.getActivity(this, 1, open,
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        // Notification.Builder(Context, String) API 26+; minSdk 23'te çökmesin
+        Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            ? new Notification.Builder(this, CHANNEL_ID)
+            : new Notification.Builder(this);
+        return b.setContentTitle("TouchNav")
+            .setContentText(L.s("TouchNav çalışıyor", "TouchNav is running"))
             .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .addAction(android.R.drawable.ic_delete, getString(R.string.action_stop), pi)
+            .setContentIntent(openPi)
+            .setOngoing(true)
+            .addAction(android.R.drawable.ic_delete, L.stop(), pi)
             .build();
     }
 

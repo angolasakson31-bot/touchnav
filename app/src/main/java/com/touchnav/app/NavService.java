@@ -49,11 +49,19 @@ public class NavService extends AccessibilityService {
 
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 && event.getPackageName() != null) {
-            // Pencere değişimini FloatingService'e bildir (otomatik gizle)
-            Intent i = new Intent("com.touchnav.WINDOW_CHANGED");
-            i.setPackage(getPackageName()); // Android 12+ için zorunlu
-            i.putExtra("package", event.getPackageName().toString());
-            sendBroadcast(i);
+            String pkg = event.getPackageName().toString();
+            // Klavye, sistem arayüzü (bildirim paneli, ses çubuğu) ve kendi
+            // uygulamamız "ön plandaki uygulama" değildir. Eskiden örn. banka
+            // uygulamasında klavye açılınca gelen olay gizlemeyi bozuyor ve
+            // buton güvenli ekranın üstüne geri geliyordu.
+            if (!isTransientPackage(pkg) && !pkg.equals(lastForegroundPkg)) {
+                lastForegroundPkg = pkg;
+                // Pencere değişimini FloatingService'e bildir (otomatik gizle)
+                Intent i = new Intent("com.touchnav.WINDOW_CHANGED");
+                i.setPackage(getPackageName()); // Android 12+ için zorunlu
+                i.putExtra("package", pkg);
+                sendBroadcast(i);
+            }
         }
 
         // Klavye kontrolü tetikleyicileri:
@@ -67,6 +75,23 @@ public class NavService extends AccessibilityService {
             scheduleKeyboardChecks();
         }
     }
+
+    private String lastForegroundPkg = null;
+
+    /** Ön plan uygulaması sayılmayan, geçici üst katman paketleri. */
+    private boolean isTransientPackage(String pkg) {
+        if (pkg.equals("com.android.systemui")) return true;
+        if (pkg.equals(getPackageName())) return false; // kendi ayar ekranımız: göster
+        try {
+            String ime = android.provider.Settings.Secure.getString(
+                getContentResolver(), android.provider.Settings.Secure.DEFAULT_INPUT_METHOD);
+            if (ime != null && ime.startsWith(pkg + "/")) return true;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    /** FloatingService yeniden başlayınca güncel ön plan paketini tekrar ister. */
+    public String getLastForegroundPkg() { return lastForegroundPkg; }
 
     /**
      * Klavye penceresi, tetikleyici olaydan birkaç yüz ms SONRA (açılış
@@ -164,6 +189,6 @@ public class NavService extends AccessibilityService {
         Intent i = new Intent(Intent.ACTION_MAIN);
         i.addCategory(Intent.CATEGORY_HOME);
         i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(i);
+        try { startActivity(i); } catch (Exception ignored) {}
     }
 }

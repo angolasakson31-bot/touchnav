@@ -26,21 +26,43 @@ public class TouchNavWidget extends AppWidgetProvider {
             if (FloatingService.isRunning()) {
                 settings.setServiceEnabled(false);
                 ctx.stopService(new Intent(ctx, FloatingService.class));
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                    && !android.provider.Settings.canDrawOverlays(ctx)) {
+                // İzin yoksa servis düğmesiz açılırdı — uygulamayı aç, izni orada versin
+                Intent open = new Intent(ctx, MainActivity.class);
+                open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try { ctx.startActivity(open); } catch (Exception ignored) {}
             } else {
                 settings.setServiceEnabled(true);
                 Intent svc = new Intent(ctx, FloatingService.class);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    ctx.startForegroundService(svc);
-                else
-                    ctx.startService(svc);
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        ctx.startForegroundService(svc);
+                    else
+                        ctx.startService(svc);
+                } catch (Exception e) {
+                    // Android 12+ arka plan başlatma kısıtı vb. — uygulamayı aç
+                    settings.setServiceEnabled(false);
+                    Intent open = new Intent(ctx, MainActivity.class);
+                    open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try { ctx.startActivity(open); } catch (Exception ignored) {}
+                }
             }
             // Widget'ı kısa gecikmeyle yenile (servis başlamış olsun)
-            new android.os.Handler().postDelayed(() -> {
-                AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
-                int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, TouchNavWidget.class));
-                for (int id : ids) updateWidget(ctx, mgr, id);
-            }, 500);
+            final Context app = ctx.getApplicationContext();
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                .postDelayed(() -> refreshAll(app), 500);
         }
+    }
+
+    /** Tüm widget'ları güncel servis durumuyla yeniler (servis aç/kapa olunca çağrılır). */
+    static void refreshAll(Context ctx) {
+        try {
+            AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
+            if (mgr == null) return;
+            int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, TouchNavWidget.class));
+            for (int id : ids) updateWidget(ctx, mgr, id);
+        } catch (Exception ignored) {}
     }
 
     private static void updateWidget(Context ctx, AppWidgetManager mgr, int id) {
