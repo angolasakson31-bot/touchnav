@@ -19,7 +19,7 @@ public class NavService extends AccessibilityService {
     private int     lastKbTop          = -1;
 
     private final Handler  kbHandler = new Handler();
-    private final Runnable kbCheck   = this::detectKeyboard;
+    private final Runnable kbCheck   = () -> detectKeyboard(false);
 
     @Override
     public void onServiceConnected() {
@@ -103,9 +103,10 @@ public class NavService extends AccessibilityService {
      */
     private void scheduleKeyboardChecks() {
         kbHandler.removeCallbacks(kbCheck);
-        detectKeyboard();
+        detectKeyboard(false);
         kbHandler.postDelayed(kbCheck, 250);
         kbHandler.postDelayed(kbCheck, 600);
+        kbHandler.postDelayed(kbCheck, 1200); // yavaş kapanma animasyonları için
     }
 
     /**
@@ -117,7 +118,18 @@ public class NavService extends AccessibilityService {
      * yeniden SHOW gönderilir ki buton yeni üst kenara taşınabilsin.
      * setPackage() olmadan Android 12+'de broadcast sessizce düşer.
      */
-    private void detectKeyboard() {
+    /**
+     * Durum değişmemiş olsa bile klavyenin gerçek durumunu yayınlar.
+     * FloatingService ekran açılınca / uygulama değişince / yeniden başlayınca
+     * çağırır: kaçırılmış bir "gizle" olayı yüzünden butonun klavye üstünde
+     * takılı kalmasını önler.
+     */
+    public void resyncKeyboard() {
+        kbHandler.post(() -> detectKeyboard(true));
+        kbHandler.postDelayed(kbCheck, 400);
+    }
+
+    private void detectKeyboard(boolean force) {
         boolean kbVisible = false;
         int kbHeight = 0, kbTop = -1;
         try {
@@ -140,7 +152,7 @@ public class NavService extends AccessibilityService {
         // Klavye açıkken üst kenar 40px'ten fazla kaydıysa (panel değişimi) yeniden bildir
         boolean resized = kbVisible && keyboardWasVisible
                 && lastKbTop >= 0 && kbTop >= 0 && Math.abs(kbTop - lastKbTop) > 40;
-        if (!changed && !resized) return;
+        if (!changed && !resized && !force) return;
 
         keyboardWasVisible = kbVisible;
         lastKbTop = kbVisible ? kbTop : -1;

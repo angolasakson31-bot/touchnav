@@ -80,8 +80,8 @@ public class L {
     public static String cardTempHide()    { return s("GEÇİCİ KAPATMA", "TEMPORARY CLOSE"); }
     public static String tempHideDur()     { return s("Kapalı kalma süresi", "Stay-closed duration"); }
     public static String tempHideInfo()    { return s(
-        "Bir harekete 'Geçici Kapat' atarsan, o hareketi yapınca buton TAMAMEN kapanır (Google Play, banka ve ödeme ekranlarında dokunma engeli kalkar). Belirlediğin saniye sonra buton kendiliğinden geri gelir.",
-        "Assign 'Temporarily Close' to a gesture: doing it FULLY removes the button (touch blocking on Google Play, banking and payment screens disappears). The button returns by itself after the seconds you set."); }
+        "Bir harekete 'Geçici Kapat' atarsan, o hareketi yapınca buton TAMAMEN kapanır: görünmez, dokunulamaz ve Google Play, banka, ödeme ekranlarındaki dokunma engeli de kalkar (eski 'Gizlilik' özelliği buna dahil edildi). Belirlediğin saniye sonra buton kendiliğinden geri gelir.",
+        "Assign 'Temporarily Close' to a gesture: doing it FULLY removes the button — invisible, untouchable, and touch blocking on Google Play, banking and payment screens disappears (the old 'Privacy' feature is now part of this). The button returns by itself after the seconds you set."); }
 
     // ── Ayar etiketleri ───────────────────────────────────────────
     public static String opacity()      { return s("Opaklık", "Opacity"); }

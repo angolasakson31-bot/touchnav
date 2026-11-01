@@ -301,7 +301,6 @@ public class SettingsActivity extends Activity {
         buildShapeCard();
         buildIconCard();
         buildAppearanceCard();
-        buildTransparencyCard();
         buildVibrationCard();
         buildTimingCard();
         buildOptionsCard();
@@ -369,7 +368,22 @@ public class SettingsActivity extends Activity {
         }
     }
 
-    private String[] actions() { return L.actionLabels(); }
+    // Spinner'da gösterilen aksiyonlar (eski "Gizlilik" (8) yok — Geçici Kapat ile birleşti).
+    // Spinner konumu ≠ aksiyon kimliği; çeviri aşağıdaki yardımcılarla yapılır.
+    private static final int[] ACTION_IDS = {0,1,2,3,4,5,6,7,9,10,11};
+    private String[] actions() {
+        String[] all=L.actionLabels(); String[] r=new String[ACTION_IDS.length];
+        for(int i=0;i<ACTION_IDS.length;i++) r[i]=all[ACTION_IDS[i]];
+        return r;
+    }
+    private static int actionToPos(int id) {
+        id=SettingsManager.migrateAction(id);
+        for(int i=0;i<ACTION_IDS.length;i++) if(ACTION_IDS[i]==id) return i;
+        return actionToPos(SettingsManager.ACTION_NONE);
+    }
+    private static int posToAction(int pos) {
+        return (pos>=0&&pos<ACTION_IDS.length)?ACTION_IDS[pos]:SettingsManager.ACTION_NONE;
+    }
 
     private void buildLanguageCard() {
         LinearLayout card=makeCard(L.language(),null);
@@ -547,18 +561,6 @@ public class SettingsActivity extends Activity {
             40,140,settings.getSize(),"dp",v->{settings.setSize(v);sendRefresh();});
     }
 
-    private void buildTransparencyCard() {
-        LinearLayout card=makeCard(L.cardTransparency(),
-            L.isTr()?"Bir harekete 'Gizlilik' atandığında buton tamamen kaybolur, dokunulamaz. Fotoğraf çekerken kullanışlı."
-                    :"When 'Privacy' is assigned to a gesture, button becomes fully invisible and untouchable.");
-        addToggle(card,L.transparencyToggle(),
-            L.isTr()?"Harekete atanabilmesi için açık olmalı.":"Must be on to assign to a gesture.",
-            settings.isTransparencyShortcut(),v->{settings.setTransparencyShortcut(v);sendRefresh();});
-        addSliderF(card,L.transparencyDur(),
-            L.isTr()?"Bu kadar saniye sonra buton tekrar görünür olur.":"Button reappears after this many seconds.",
-            1f,30f,1f,settings.getTransparencyDuration()/1000f,"s",v->settings.setTransparencyDuration(v));
-    }
-
     private void buildTempHideCard() {
         LinearLayout card=makeCard(L.cardTempHide(),L.tempHideInfo());
         TextView note=new TextView(this);
@@ -568,7 +570,7 @@ public class SettingsActivity extends Activity {
         note.setTextColor(accent()); note.setTextSize(11.5f); note.setPadding(0,0,0,px(10)); card.addView(note);
         addSliderF(card,L.tempHideDur(),
             L.isTr()?"Buton bu kadar saniye TAMAMEN kapalı kalır, sonra geri gelir.":"Button stays FULLY closed for this many seconds, then returns.",
-            3f,60f,1f,settings.getTempHideDuration()/1000f,"s",v->settings.setTempHideDuration(v));
+            1f,60f,1f,settings.getTempHideDuration()/1000f,"s",v->settings.setTempHideDuration(v));
     }
 
     private void buildVibrationCard() {
@@ -638,7 +640,8 @@ public class SettingsActivity extends Activity {
         int[] vals={settings.getSingleTap(),settings.getDoubleTap(),settings.getSwipeRight(),
                     settings.getSwipeLeft(),settings.getSwipeUp(),settings.getSwipeDown()};
         String[] a=actions();
-        for(int i=0;i<6;i++){final int idx=i; addSpinner(card,lbls[i],null,a,vals[i],pos->{
+        for(int i=0;i<6;i++){final int idx=i; addSpinner(card,lbls[i],null,a,actionToPos(vals[i]),p->{
+            int pos=posToAction(p);
             switch(idx){
                 case 0:settings.setSingleTap(pos);break; case 1:settings.setDoubleTap(pos);break;
                 case 2:settings.setSwipeRight(pos);break; case 3:settings.setSwipeLeft(pos);break;
@@ -771,8 +774,8 @@ public class SettingsActivity extends Activity {
             settings.isDrawGestureEnabled(),v->{settings.setDrawGestureEnabled(v);sendRefresh();buildCards();});
         if (!settings.isDrawGestureEnabled()) return;
         String[] a=actions();
-        addSpinner(card,L.lShape(),null,a,settings.getDrawGestureL(),v->{settings.setDrawGestureL(v);buildCards();});
-        addSpinner(card,L.zShape(),null,a,settings.getDrawGestureZ(),v->{settings.setDrawGestureZ(v);buildCards();});
+        addSpinner(card,L.lShape(),null,a,actionToPos(settings.getDrawGestureL()),v->{settings.setDrawGestureL(posToAction(v));buildCards();});
+        addSpinner(card,L.zShape(),null,a,actionToPos(settings.getDrawGestureZ()),v->{settings.setDrawGestureZ(posToAction(v));buildCards();});
     }
 
     private void buildKeyboardCard() {

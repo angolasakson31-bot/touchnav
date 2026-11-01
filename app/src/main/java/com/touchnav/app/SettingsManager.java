@@ -17,6 +17,7 @@ public class SettingsManager {
     public static final int ACTION_APP_DRAWER    = 5;
     public static final int ACTION_NONE          = 6;
     public static final int ACTION_SCREEN_RECORD = 7;
+    /** ESKİ "Gizlilik" — artık Geçici Kapat ile birleşti; kayıtlı 8 değeri 11'e çevrilir. */
     public static final int ACTION_TRANSPARENCY  = 8;
     public static final int ACTION_ASSISTANT     = 9;
     public static final int ACTION_TORCH         = 10;
@@ -62,6 +63,12 @@ public class SettingsManager {
     public static final int PRESET_RIGHT  =  1;
     public static final int PRESET_TOP    =  2;
     public static final int PRESET_BOTTOM =  3;
+
+    /** Kayıtlı aksiyonu geçerli aralığa sıkıştırır ve eski Gizlilik'i Geçici Kapat'a çevirir. */
+    public static int migrateAction(int v) {
+        if (v < 0 || v > ACTION_MAX_VALID) return ACTION_NONE;
+        return v == ACTION_TRANSPARENCY ? ACTION_HIDE_TEMP : v;
+    }
 
     public SettingsManager(Context context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -188,13 +195,11 @@ public class SettingsManager {
     public boolean isDrawGestureEnabled() { return prefs.getBoolean("draw_gesture", false); }
     public void setDrawGestureEnabled(boolean v) { prefs.edit().putBoolean("draw_gesture", v).apply(); }
     public int getDrawGestureL() {
-        int v = prefs.getInt("draw_gesture_l", ACTION_SCREEN_RECORD);
-        return Math.min(v, ACTION_MAX_VALID);
+        return migrateAction(prefs.getInt("draw_gesture_l", ACTION_SCREEN_RECORD));
     }
     public void setDrawGestureL(int v) { prefs.edit().putInt("draw_gesture_l", Math.min(v, ACTION_MAX_VALID)).apply(); }
     public int getDrawGestureZ() {
-        int v = prefs.getInt("draw_gesture_z", ACTION_TRANSPARENCY);
-        return Math.min(v, ACTION_MAX_VALID);
+        return migrateAction(prefs.getInt("draw_gesture_z", ACTION_HIDE_TEMP));
     }
     public void setDrawGestureZ(int v) { prefs.edit().putInt("draw_gesture_z", Math.min(v, ACTION_MAX_VALID)).apply(); }
 
@@ -204,8 +209,7 @@ public class SettingsManager {
 
     // ── Hareketler (clamp ile — eski ACTION_ASSISTANT/TORCH koruması) ──
     private int safeAction(String key, int def) {
-        int v = prefs.getInt(key, def);
-        return Math.min(v, ACTION_MAX_VALID);
+        return migrateAction(prefs.getInt(key, def));
     }
     public int getSwipeRight() { return safeAction("swipe_right", ACTION_BACK); }
     public void setSwipeRight(int v) { prefs.edit().putInt("swipe_right", v).apply(); }

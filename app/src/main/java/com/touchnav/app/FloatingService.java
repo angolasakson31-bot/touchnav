@@ -90,6 +90,7 @@ public class FloatingService extends Service {
     private int     currentColor;
     private int     drawColor;
     private boolean keyboardVisible    = false;
+    private boolean kbLifted          = false; // buton klavye yüzünden GEÇİCİ olarak yukarı alındı mı
     private boolean viewAttached      = false; // overlay window WindowManager'a ekli mi
     private boolean tempHidden        = false; // "Geçici Kapat" aksiyonu aktif mi
     private int     notifCount        = 0;
@@ -135,10 +136,28 @@ public class FloatingService extends Service {
             currentPkg = pkg;
             evaluateHiddenByPkg();
             updateVisibility();
+            // Uygulama değişti: klavye bu sırada kapanmış olabilir
+            if (keyboardVisible) resyncKeyboard();
         }
     };
 
     private String currentPkg = null;
+
+    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context ctx, Intent i) { resyncKeyboard(); }
+    };
+
+    /** NavService'ten klavyenin GERÇEK durumunu tekrar yayınlamasını ister. */
+    private void resyncKeyboard() {
+        NavService nav = NavService.getInstance();
+        if (nav != null) nav.resyncKeyboard();
+        else if (keyboardVisible) {
+            // Erişilebilirlik yoksa klavye durumu bilinemez: güvenli tarafta kal,
+            // butonu kalıcı yerine indir.
+            Intent hide = new Intent(ACTION_KEYBOARD_HIDE).setPackage(getPackageName());
+            keyboardReceiver.onReceive(this, hide);
+        }
+    }
 
     /** Ön plandaki paket gizleme listesinde mi? (ayar değişince de yeniden değerlendirilir) */
     private void evaluateHiddenByPkg() {
@@ -202,6 +221,7 @@ public class FloatingService extends Service {
                         params.y = Math.max(dpToPx(8), kbTop - gap - params.height);
                     }
                 }
+                kbLifted = params.y != settings.getY();
                 // NOT: Geçici taşımayı KAYITLI konuma yazmıyoruz — klavye kapanınca
                 // settings.getX/getY üzerinden kalıcı konuma dönülür.
                 params.x = clamp(params.x, 0, screenW - params.width);
@@ -220,6 +240,7 @@ public class FloatingService extends Service {
                 params.height = sizePx;
                 params.x = clamp(settings.getX(), 0, screenW - sizePx);
                 params.y = clamp(settings.getY(), 0, screenH - sizePx);
+                kbLifted = false;
 
                 homeX = params.x;
                 homeY = params.y;
@@ -312,6 +333,12 @@ public class FloatingService extends Service {
             return;
         }
         TouchNavWidget.refreshAll(this);
+        // Ekran açılınca klavye durumunu yeniden eşitle (ekran kapalıyken
+        // kapanan klavyenin "gizle" olayı kaçabiliyordu → buton yukarıda kalıyordu)
+        IntentFilter scr = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        scr.addAction(Intent.ACTION_USER_PRESENT);
+        ContextCompat.registerReceiver(this, screenReceiver, scr, ContextCompat.RECEIVER_EXPORTED);
+        resyncKeyboard();
         // Sticky pil broadcast'ı createFloatingButton öncesinde gelmiş olabilir;
         // floatView null iken uygulanamayan rengi şimdi yenile.
         updateDrawColor();
@@ -369,6 +396,7 @@ public class FloatingService extends Service {
         try { unregisterReceiver(keyboardReceiver);} catch (Exception ignored) {}
         try { unregisterReceiver(batteryReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(notifReceiver);   } catch (Exception ignored) {}
+        try { unregisterReceiver(screenReceiver);  } catch (Exception ignored) {}
         cancelGhostTimer();
         longPressHandler.removeCallbacksAndMessages(null);
         ghostHandler.removeCallbacksAndMessages(null);
@@ -830,6 +858,7 @@ public class FloatingService extends Service {
                         if (moved) {
                             homeX = params.x; homeY = params.y;
                             settings.savePosition(params.x, params.y);
+                            kbLifted = false; // kullanıcı bilerek buraya koydu
                         }
                     } else {
                         final int fx = params.x, fy = params.y;
@@ -851,7 +880,15 @@ public class FloatingService extends Service {
                 // basit bir dokunuş bile klavye üstüne kaldırılmış GEÇİCİ konumu
                 // kalıcı konum olarak kaydediyor, klavye kapanınca buton eski
                 // yerine dönmüyordu.
-                if (!settings.isLocked() && moved) {
+                if (kbLifted && moved) {
+                    // Buton klavye yüzünden geçici olarak yukarıdayken yapılan
+                    // kaydırma, bu GEÇİCİ yüksek konumu kalıcı konum yapıyordu →
+                    // klavye kapanınca buton yukarıda kalıyordu ("kendi kendine
+                    // yukarı kayma"). Klavye açıkken kaydırma sadece aksiyon
+                    // yapar, buton klavye üstündeki yerine geri döner.
+                    // (Kalıcı yer değiştirmek için uzun basıp sürükle.)
+                    animateReturnHome(params.x, params.y);
+                } else if (!settings.isLocked() && moved) {
                     settings.savePosition(params.x, params.y);
                     homeX = params.x; homeY = params.y;
                 }
@@ -911,7 +948,7 @@ public class FloatingService extends Service {
     private void doAction(int action) {
         switch (action) {
             case SettingsManager.ACTION_SCREEN_RECORD: startScreenRecord(); return;
-            case SettingsManager.ACTION_TRANSPARENCY:  toggleTransparency(); return;
+            case SettingsManager.ACTION_TRANSPARENCY:  hideTemporarily(); return; // eski Gizlilik → Geçici Kapat
             case SettingsManager.ACTION_ASSISTANT:     launchAssistant(); return;
             case SettingsManager.ACTION_TORCH:         toggleTorch(); return;
             case SettingsManager.ACTION_HIDE_TEMP:     hideTemporarily(); return;
@@ -932,19 +969,6 @@ public class FloatingService extends Service {
             if (nav != null && Build.VERSION.SDK_INT >= 28)
                 nav.performGlobalAction(NavService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS);
         }
-    }
-
-    private void toggleTransparency() {
-        if (floatView == null) return;
-        if (transparencyActive) { cancelTransparencyTimer(); return; }
-        cancelGhostTimer();
-        transparencyActive = true;
-        // Görünmez + dokunulamaz yap (tam gizlilik — o konuma basınca buton olmaz)
-        floatView.animate().alpha(0f).setDuration(150).start();
-        params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-        try { windowManager.updateViewLayout(floatView, params); } catch (Exception ignored) {}
-        transparencyRunnable = this::cancelTransparencyTimer;
-        transparencyHandler.postDelayed(transparencyRunnable, settings.getTransparencyDuration());
     }
 
     private void cancelTransparencyTimer() {
